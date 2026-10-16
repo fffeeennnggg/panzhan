@@ -1,0 +1,81 @@
+#!/bin/bash
+# fnOS invokes this script as the dedicated, unprivileged package user.
+set -u
+umask 077
+
+fail() {
+    printf '%s\n' "$1" >&2
+    if [ -n "${TRIM_TEMP_LOGFILE:-}" ]; then
+        printf '%s\n' "$1" > "$TRIM_TEMP_LOGFILE"
+    fi
+    exit 1
+}
+
+[ -n "${TRIM_APPDEST:-}" ] && [ -n "${TRIM_PKGVAR:-}" ] || fail "Missing fnOS application paths."
+binary=$(readlink -f -- "$TRIM_APPDEST/bin/panzhan") || fail "Cannot resolve application binary."
+pid_file="$TRIM_PKGVAR/panzhan.pid"
+
+# Start time guards against PID reuse. Executable identity guards against a
+# stale or malformed pidfile pointing at another application.
+process_start() {
+    local stat tail
+    stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+    tail=${stat##*) }
+    set -- $tail
+    [ "$#" -ge 20 ] || return 1
+    printf '%s\n' "${20}"
+}
+
+running() {
+    [ -f "$pid_file" ] || return 1
+    read -r pid born < "$pid_file" || return 1
+    [[ "$pid" =~ ^[1-9][0-9]*$ && "$born" =~ ^[0-9]+$ ]] || return 1
+    [ "$(readlink -f -- "/proc/$pid/exe" 2>/dev/null)" = "$binary" ] || return 1
+    [ "$(process_start "$pid")" = "$born" ] || return 1
+    kill -0 "$pid" 2>/dev/null
+}
+
+case "${1:-}" in
+    start|stop|status) ;;
+    *) fail "Usage: main {start|stop|status}" ;;
+esac
+[ -d "$TRIM_PKGVAR" ] || fail "Application data directory is missing."
+# flock serializes start/stop/status without stale lock-directory problems.
+exec 9> "$TRIM_PKGVAR/lifecycle.lock"
+flock -w 15 9 || fail "Another application operation is in progress."
+
+case "$1" in
+    start)
+        running && exit 0
+        [ -x "$binary" ] || fail "Application binary is missing or not executable."
+        download_root=${TRIM_DATA_SHARE_PATHS:-}
+        download_root=${download_root%%:*}
+        [ -n "$download_root" ] && [ -d "$download_root" ] && [ -w "$download_root" ] || fail "The panzhan/downloads shared directory is unavailable or not writable."
+        # Only internal state is private; shared-directory ACLs stay managed by fnOS.
+        chmod 700 "$TRIM_PKGVAR" || fail "Cannot protect application state."
+        "$binary" -listen :9867 -data "$TRIM_PKGVAR" -root "$download_root" \
+            >> "$TRIM_PKGVAR/panzhan.log" 2>&1 < /dev/null 9>&- &
+        pid=$!
+        born=$(process_start "$pid") || fail "Application exited before startup; inspect panzhan.log."
+        printf '%s %s\n' "$pid" "$born" > "$pid_file"
+        sleep 1
+        running || fail "Application failed to start; inspect panzhan.log."
+        ;;
+    stop)
+        if running; then
+            kill -TERM "$pid" || fail "Cannot signal application process."
+            # Allow the server's 20-second graceful shutdown deadline to finish.
+            for attempt in {1..25}; do
+                running || break
+                sleep 1
+            done
+            running && fail "Application has not stopped yet; retry after checking its log."
+        fi
+        rm -f -- "$pid_file"
+        ;;
+    status)
+        running && exit 0
+        exit 3
+        ;;
+esac
+exit 0

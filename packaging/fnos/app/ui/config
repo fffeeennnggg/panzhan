@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "panzhan.main": {
+      "title": "盘栈",
+      "icon": "images/icon_{0}.png",
+      "type": "url",
+      "protocol": "http",
+      "port": "9867",
+      "url": "/",
+      "allUsers": false,
+      "control": {"accessPerm": "readonly"}
+    }
+  }
+}

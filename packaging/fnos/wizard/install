@@ -1,0 +1,11 @@
+[
+  {
+    "stepTitle": "盘栈原生安装",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "应用以独立用户运行，下载文件位于系统创建的 panzhan/downloads 共享目录。管理页面使用 HTTP 9867 端口，请在可信局域网访问。首次启动后，通过管理员 SSH 读取 /var/apps/panzhan/var/setup-token.txt，再在页面设置管理员密码。"
+      }
+    ]
+  }
+]

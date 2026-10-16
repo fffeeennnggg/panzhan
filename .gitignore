@@ -1,0 +1,13 @@
+.cache/
+.tmp/
+data/
+downloads/
+dist/
+web/node_modules/
+web/dist/
+__pycache__/
+*.pyc
+*.log
+*.fpk
+*.exe
+.env

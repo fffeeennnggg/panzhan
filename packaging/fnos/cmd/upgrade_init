@@ -1,0 +1,3 @@
+#!/bin/bash
+# fnOS manages installation and shared-directory ACLs. Preserve all user data.
+exit 0

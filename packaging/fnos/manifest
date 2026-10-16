@@ -1,0 +1,15 @@
+appname=panzhan
+version=0.1.0
+display_name=盘栈
+desc=独立搜索、夸克转存与NAS下载单进程应用，无需其他服务。
+platform=x86
+source=thirdparty
+maintainer=PanZhan contributors
+distributor=PanZhan contributors
+desktop_uidir=ui
+desktop_applaunchname=panzhan.main
+service_port=9867
+checkport=true
+ctl_stop=true
+disable_authorization_path=false
+changelog=首次发布：原生 Linux x86_64 单进程应用。
