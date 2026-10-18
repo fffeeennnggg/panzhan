@@ -71,6 +71,10 @@ type InitializablePlugin interface {
 // 是为了避免并发请求共享同一个插件实例时互相覆盖。
 const ExtContextKey = "_ctx"
 
+// ExtWaitForFinal disables the early partial response for callers that do not
+// consume background cache updates. Such callers must supply a bounded context.
+const ExtWaitForFinal = "_wait_for_final"
+
 // ExtMainCacheKey 是 ext 中承载"本次请求该写哪个主缓存键"的键。
 //
 // 为什么走 ext 而不放在插件实例上：插件实例是全局注册表里的共享单例，service 层
@@ -898,6 +902,10 @@ func (p *BaseAsyncPlugin) AsyncSearch(
 		return []model.SearchResult{}
 	}
 
+	var responseDeadline <-chan time.Time
+	if ext[ExtWaitForFinal] != true {
+		responseDeadline = time.After(responseTimeout)
+	}
 	// 等待响应超时、调用方取消或结果
 	select {
 	case results := <-resultChan:
@@ -918,9 +926,13 @@ func (p *BaseAsyncPlugin) AsyncSearch(
 			}
 		}
 		return nil, err
-	case <-time.After(responseTimeout):
+	case <-responseDeadline:
 		return partial(), nil
 	case <-searchCtx.Done():
+		if ext[ExtWaitForFinal] == true {
+			close(doneChan)
+			return nil, searchCtx.Err()
+		}
 		return partial(), nil
 	}
 }
@@ -1077,6 +1089,10 @@ func (p *BaseAsyncPlugin) AsyncSearchWithResult(
 		}
 	}
 
+	var responseDeadline <-chan time.Time
+	if ext[ExtWaitForFinal] != true {
+		responseDeadline = time.After(responseTimeout)
+	}
 	select {
 	case results := <-resultChan:
 		// 不直接关闭，让defer处理
@@ -1119,9 +1135,12 @@ func (p *BaseAsyncPlugin) AsyncSearchWithResult(
 		}
 		return model.PluginSearchResult{}, err
 
-	case <-time.After(responseTimeout):
+	case <-responseDeadline:
 		return pending(), nil
 	case <-searchCtx.Done():
+		if ext[ExtWaitForFinal] == true {
+			return model.PluginSearchResult{}, searchCtx.Err()
+		}
 		return pending(), nil
 	}
 }

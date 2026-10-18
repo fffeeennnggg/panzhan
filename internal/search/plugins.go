@@ -90,8 +90,13 @@ func panSouNeedsConfig(name string) bool {
 }
 
 func (p panSouAdapter) Search(ctx context.Context, query string) ([]Result, error) {
-	const contextKey = "_ctx"
-	items, err := p.plugin.Search(query, map[string]interface{}{contextKey: ctx})
+	ctx, cancel := context.WithTimeout(ctx, sourceTimeout)
+	defer cancel()
+	// Panzhan sends one response per source and has no PanSou background-cache
+	// callback. Wait for completion instead of treating the 4s partial reply as final.
+	items, err := p.plugin.Search(query, map[string]interface{}{
+		plugin.ExtContextKey: ctx, plugin.ExtWaitForFinal: true,
+	})
 	if err != nil {
 		return nil, err
 	}

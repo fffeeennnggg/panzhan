@@ -61,6 +61,12 @@ class BuildTests(unittest.TestCase):
             self.assertEqual(entry["port"], "9867")
             self.assertEqual(entry["type"], "url")
             self.assertEqual(json.loads((stage / "config/resource").read_text())["data-share"]["shares"], [{"name": "panzhan/downloads"}])
+            wizard = json.loads((stage / "wizard/install").read_text())
+            fields = {item.get("field") for step in wizard for item in step["items"]}
+            self.assertIn("wizard_admin_password", fields)
+            self.assertIn("wizard_admin_password_confirm", fields)
+            for script in (stage / "cmd").iterdir():
+                self.assertNotIn(b"\r", script.read_bytes(), "staged lifecycle scripts must use LF even on Windows")
 
     def test_fpk_rejects_binary_without_owner_executable_permission(self):
         self.assertTrue(callable(globals().get("check_fpk")), "FPK checker must reject non-executable payloads")
@@ -150,8 +156,12 @@ def check_fpk(package: Path):
                 raise ValueError("FPK must include third-party license texts")
             for name in ["ui/config", "config/privilege", "config/resource"]:
                 json.loads(inner.extractfile(name).read())
-        for name in ["cmd/main", "config/privilege", "config/resource", "ICON.PNG", "ICON_256.PNG", "wizard/install"]:
+        for name in ["cmd/main", "cmd/install_callback", "config/privilege", "config/resource", "ICON.PNG", "ICON_256.PNG", "wizard/install"]:
             outer.getmember(name)
+        wizard = json.loads(outer.extractfile("wizard/install").read())
+        wizard_fields = {item.get("field") for step in wizard for item in step["items"]}
+        if not {"wizard_admin_password", "wizard_admin_password_confirm"}.issubset(wizard_fields):
+            raise ValueError("FPK install wizard must collect and confirm the initial password")
         privilege = json.loads(outer.extractfile("config/privilege").read())
         if privilege.get("defaults", {}).get("run-as") != "package":
             raise ValueError("native application must run as the dedicated package user")

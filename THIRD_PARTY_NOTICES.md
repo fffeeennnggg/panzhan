@@ -24,6 +24,7 @@
 - 快照：221665fb2c9279f22af4684ea2d8c0c331eac1cc。
 - 许可：MIT，完整上游版权声明与许可见 `licenses/PanSou-MIT.txt`。
 - 使用：issue #4 中列出的 67 个 `plugin/` 搜索适配器，以及它们所需的 `model`、`plugin`、`config` 和 `util` 共用代码。
+- Telegram 频道清单：来自 https://github.com/fish2018/pansou/issues/4 ，issue 更新于 2026-10-09，获取于 2026-10-17；采用 `CHANNELS` 中的 111 个不同用户名（标题写作 110），保存在 `internal/search/telegram_channels.txt`。
 - 本项目对应：`internal/search/panplugin/`。适配器在盘栈进程内通过盘栈的搜索入口运行；未迁入 PanSou `main`、API/service HTTP 服务、认证、缓存服务或独立网页。插件所需的第三方管理路由不会由盘栈挂载。结果转换仅保留通过 HTTPS 主机校验的夸克分享，并传递提取码和作品标题。
 - 修改：内部模块导入路径改为 `panzhan/internal/search/panplugin/...`；在统一结果转换层适配盘栈模型；注册清单以 issue #4 为准。迁入的上游 Go 文件标注 `SPDX-License-Identifier: MIT`，完整许可仍随包分发。
 
@@ -32,6 +33,12 @@
 - 项目：https://go.googlesource.com/net
 - 版本：v0.46.0。
 - 使用：HTML parser；许可为 BSD-3-Clause，完整条款见 `licenses/Go-x-net-BSD.txt`。
+
+## Work Sans
+
+- 项目：https://github.com/weiweihuanghuang/Work-Sans。
+- 字体经 Google Fonts 分发，使用 SIL Open Font License 1.1。
+- 本地字体与完整许可证：`internal/web/assets/fonts/work-sans-latin.woff2`、`internal/web/assets/fonts/OFL.txt`。浏览器直接从本机应用加载字体，不请求外部字体服务。
 
 ## PanHub
 

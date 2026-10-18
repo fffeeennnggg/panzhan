@@ -33,19 +33,22 @@ type Source struct {
 	PriorityChannels []string `json:"-"`
 }
 type Result struct {
-	Title        string   `json:"title"`
-	URL          string   `json:"url"`
-	Source       string   `json:"source"`
-	ID           string   `json:"id"`
-	Provider     string   `json:"provider"`
-	Origins      []Origin `json:"origins"`
-	DiscoveredAt string   `json:"discovered_at,omitempty"`
-	LastSeenAt   string   `json:"last_seen_at,omitempty"`
-	PublishedAt  string   `json:"published_at,omitempty"`
-	CheckedAt    string   `json:"checked_at,omitempty"`
-	Availability string   `json:"availability"`
-	Local        bool     `json:"local,omitempty"`
-	Cached       bool     `json:"cached,omitempty"`
+	Title        string                `json:"title"`
+	URL          string                `json:"url"`
+	Source       string                `json:"source"`
+	ID           string                `json:"id"`
+	Provider     string                `json:"provider"`
+	Origins      []Origin              `json:"origins"`
+	DiscoveredAt string                `json:"discovered_at,omitempty"`
+	LastSeenAt   string                `json:"last_seen_at,omitempty"`
+	PublishedAt  string                `json:"published_at,omitempty"`
+	CheckedAt    string                `json:"checked_at,omitempty"`
+	Availability string                `json:"availability"`
+	CheckMessage string                `json:"check_message,omitempty"`
+	FileCount    int                   `json:"file_count,omitempty"`
+	Content      *quark.ContentSummary `json:"content,omitempty"`
+	Local        bool                  `json:"local,omitempty"`
+	Cached       bool                  `json:"cached,omitempty"`
 }
 type Status struct {
 	ID            string `json:"id"`
@@ -98,7 +101,7 @@ func New() *Engine {
 		{ID: "jikepan", Name: "极客盘", Base: "https://api.jikepan.xyz"},
 		{ID: "duoduo", Name: "多多资源", Base: "https://tv.yydsys.top"},
 		{ID: "xuexizhinan", Name: "学习指南", Base: "https://xuexizhinan.com"},
-		{ID: "telegram", Name: "Telegram 公开频道", Base: "https://t.me/s", Channels: panHubChannels(), PriorityChannels: []string{"tgsearchers3", "share_aliyun", "Quark_Movies", "NewQuark", "alyp_4K_Movies"}},
+		{ID: "telegram", Name: "Telegram 公开频道", Base: "https://t.me/s", Channels: defaultTelegramChannels(), PriorityChannels: []string{"tgsearchers7", "Quark_Movies", "Aliyun_4K_Movies", "shareAliyun", "leoziyuan"}},
 	}
 	plugins := registeredPanSouPlugins()
 	for _, source := range plugins {

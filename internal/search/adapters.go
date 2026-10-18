@@ -388,7 +388,7 @@ func stripTags(value string) string {
 func (e *Engine) searchTelegram(ctx context.Context, source Source, keyword string) ([]Result, error) {
 	channels := source.Channels
 	if len(channels) == 0 {
-		channels = panHubChannels()
+		channels = defaultTelegramChannels()
 	}
 	base := strings.TrimRight(source.Base, "/")
 	sem := make(chan struct{}, 8)
@@ -506,10 +506,6 @@ func matchesKeyword(text, keyword string) bool {
 		}
 	}
 	return false
-}
-
-func panHubChannels() []string {
-	return []string{"tgsearchers3", "share_aliyun", "Quark_Movies", "NewQuark", "alyp_4K_Movies", "yunpanqk", "BaiduCloudDisk", "tianyifc", "yunpanxunlei", "txtyzy", "peccxinpd", "gotopan", "xingqiump4", "PanjClub", "kkxlzy", "baicaoZY", "MCPH01", "bdwpzhpd", "ysxb48", "jdjdn1111", "yggpan", "MCPH086", "zaihuayun", "Q66Share", "NewAliPan", "ypquark", "Oscar_4Kmovies", "ucwpzy", "alyp_TV", "shareAliyun", "alyp_1", "dianyingshare", "XiangxiuNBB", "ydypzyfx", "kuakeyun", "ucquark", "xx123pan", "yingshifenxiang123", "zyfb123", "tyypzhpd", "tianyirigeng", "cloudtianyi", "hdhhd21", "Lsp115", "oneonefivewpfx", "Maidanglaocom", "qixingzhenren", "taoxgzy", "tgsearchers115", "Channel_Shares_115", "tyysypzypd", "vip115hot", "wp123zy", "yunpan139", "yunpan189", "yunpanuc", "yydf_hzl", "alyp_Animation", "alyp_JLP", "leoziyuan", "AliyunDrive_Share_Channel", "aliyunys", "Aliyun_4K_Movies", "yunpanpan", "Quark_Share_Channel", "quarkshare", "baiduyun", "iAliyun", "quanziyuanshe"}
 }
 
 func timeAfterBackoff(attempt int) <-chan time.Time {

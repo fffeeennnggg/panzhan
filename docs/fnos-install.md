@@ -18,6 +18,14 @@ python -X utf8 scripts/build.py --wsl --fnpack .cache/tools/fnpack-linux-amd64
 
 WSL 测试命令中的 `/mnt/e/diancai/fn` 需要替换为实际项目路径。Windows 构建会把暂存目录复制到 WSL 的临时 Linux 文件系统，设置脚本和程序为 `0755` 后调用官方工具，不依赖 Windows 挂载盘的权限模拟。需要事先安装并初始化 Ubuntu WSL；脚本不会自动安装发行版。
 
+已有其他 WSL 发行版时，可通过 `--wsl-distribution` 选择。打包只需要 POSIX shell 和基本文件工具；精简发行版系统盘空间不足时，可用 `--wsl-temp-dir /dev/shm` 指定空间充足的 Linux 临时目录。例如：
+
+```powershell
+python -X utf8 scripts/build.py --wsl --wsl-distribution docker-desktop --wsl-temp-dir /dev/shm --fnpack .cache/tools/fnpack-linux-amd64
+```
+
+构建过程会规范化启动脚本的 LF 换行，并将 fnpack 的临时文件限制在本次创建、自动清理的打包目录。目标 fnOS 的启动脚本仍依赖 Bash；打包主机不要求安装 Bash。
+
 Linux/macOS 可使用相应的官方 fnpack 可执行文件：
 
 ```sh
@@ -37,30 +45,32 @@ go build -trimpath -o dist/panzhan-linux-amd64 ./cmd/panzhan
 1. 在 x86_64 飞牛 NAS 的应用中心选择手动安装，上传 `dist` 中生成的 `.fpk`。
 2. 选择安装存储空间。系统创建 `panzhan/downloads` 共享目录，并向专用应用用户 `panzhan` 授予访问权限。
 3. 启动应用，从桌面“盘栈”入口打开，或在可信局域网访问 `http://NAS地址:9867/`。端口需要可从浏览器所在设备访问；本包没有配置反向代理或统一网关。
-4. 首次启动后，通过 NAS 管理员 SSH 读取一次性初始化令牌：
+4. 安装向导中设置并确认管理密码，安装后从应用入口直接登录。无需 SSH 或读取初始化令牌。
+5. 在“网盘账号”页保存夸克网页 Cookie 并验证，在“搜索来源”页启用内建来源。
 
-   ```sh
-   sudo cat /var/apps/panzhan/var/setup-token.txt
-   ```
-
-5. 在页面输入初始化令牌并设置管理员密码，然后登录。请勿把令牌、密码或网盘 Cookie 发到公共日志或截图。
-6. 在“网盘账号”页保存夸克网页 Cookie 并验证，在“搜索来源”页启用内建来源，在“设置”页选择授权下载目录。
+从旧版升级后仍无法登录，或忘记管理密码时，可在飞牛应用中心打开盘栈的“设置”，重新填写并确认管理密码。保存后应用会重启，使用新密码登录；账号、下载任务和文件保留。仅覆盖升级或普通重启不会改变原密码。
 
 端口入口采用应用自己的登录认证，与 fnOS 登录状态分开。桌面入口默认仅管理员可见。HTTP 端口适合可信局域网；跨网络访问应通过用户自行配置的 HTTPS 反向代理或 VPN。
+
+## 选择其他 NAS 下载位置
+
+首次安装默认使用 `panzhan/downloads`。要写入其他共享文件夹，先在飞牛应用中心的盘栈“设置/权限”中，为盘栈授予该共享目录的读写权限；然后打开盘栈“设置”页，在“NAS 共享目录路径”输入该共享的绝对路径并浏览，选中目标文件夹后保存。
+
+例如路径可能是 `/vol1/video`，实际路径以 NAS 中该共享文件夹的路径为准。授权前，盘栈无法列出该路径；没有读写授权时无法保存。应用不提升自身权限，也不创建任意全盘写入权。更改默认保存位置只影响新任务；已创建任务继续保存到原来的位置。每次安装、更新或重启后，请在“设置/权限”确认其他共享目录授权仍有效。
 
 ## 数据与权限
 
 | 内容 | 位置 |
 | --- | --- |
 | 应用程序、桌面入口 | `TRIM_APPDEST` |
-| 配置、账户信息、任务状态、初始化令牌 | `TRIM_PKGVAR` |
+| 配置、账户信息和任务状态 | `TRIM_PKGVAR` |
 | 下载文件 | `TRIM_DATA_SHARE_PATHS` 提供的 `panzhan/downloads` 共享目录 |
 | 进程日志 | `TRIM_PKGVAR/panzhan.log` |
 | 进程标识和生命周期锁 | `TRIM_PKGVAR/panzhan.pid`、`lifecycle.lock` |
 
 安装后通常可通过 `/var/apps/panzhan/target` 和 `/var/apps/panzhan/var` 的系统链接定位程序与状态目录；脚本实际使用 fnOS 环境变量，未硬编码卷编号。共享目录由 fnOS 管理 ACL，脚本不修改其权限。程序以 `run-as=package` 的专用用户执行，未申请 root、附加系统组、Docker 或全盘访问权限。
 
-下载范围固定为系统提供的共享目录。仅在 fnOS 设置中授权其他目录，不会自动改变应用的下载根目录。本版本不提供任意系统路径写入功能。
+下载默认使用系统提供的共享目录。仅在 fnOS 设置中授权其他目录，不会自动改变应用的下载根目录；还需在盘栈设置中选择该已授权目录。应用以专用用户权限访问所选位置，不提升系统权限。
 
 ## 启停、升级与卸载
 

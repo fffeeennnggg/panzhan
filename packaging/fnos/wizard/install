@@ -3,8 +3,31 @@
     "stepTitle": "盘栈原生安装",
     "items": [
       {
+        "type": "password",
+        "field": "wizard_admin_password",
+        "label": "盘栈管理密码",
+        "rules": [
+          { "required": true, "message": "请设置管理密码" },
+          { "min": 8, "message": "至少输入 8 个字符" },
+          { "max": 128, "message": "不能超过 128 个字符" },
+          { "pattern": "^[\\s\\S]{8,128}$", "message": "管理密码长度需为 8 至 128 个字符" }
+        ],
+        "helpText": "安装完成后直接用此密码登录盘栈；无需读取 SSH 令牌。"
+      },
+      {
+        "type": "password",
+        "field": "wizard_admin_password_confirm",
+        "label": "再次输入管理密码",
+        "rules": [
+          { "required": true, "message": "请再次输入管理密码" },
+          { "min": 8, "message": "至少输入 8 个字符" },
+          { "max": 128, "message": "不能超过 128 个字符" },
+          { "pattern": "^[\\s\\S]{8,128}$", "message": "管理密码长度需为 8 至 128 个字符" }
+        ]
+      },
+      {
         "type": "tips",
-        "helpText": "应用以独立用户运行，下载文件位于系统创建的 panzhan/downloads 共享目录。管理页面使用 HTTP 9867 端口，请在可信局域网访问。首次启动后，通过管理员 SSH 读取 /var/apps/panzhan/var/setup-token.txt，再在页面设置管理员密码。"
+        "helpText": "下载文件位于系统创建的 panzhan/downloads 共享目录。管理页面使用 HTTP 9867 端口，建议在可信局域网访问。"
       }
     ]
   }

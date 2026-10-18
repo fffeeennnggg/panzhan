@@ -1,0 +1,29 @@
+[
+  {
+    "stepTitle": "设置盘栈管理密码",
+    "items": [
+      {
+        "type": "tips",
+        "helpText": "忘记密码或安装时设置的密码无法登录时，可在此重新设置。保存后应用会重启，新密码替换旧密码；网盘账号、下载任务和文件保留。"
+      },
+      {
+        "type": "password",
+        "field": "wizard_admin_password",
+        "label": "盘栈管理密码",
+        "rules": [
+          { "required": true, "message": "请输入管理密码" },
+          { "pattern": "^[\\s\\S]{8,128}$", "message": "管理密码长度需为 8 至 128 个字符" }
+        ]
+      },
+      {
+        "type": "password",
+        "field": "wizard_admin_password_confirm",
+        "label": "再次输入管理密码",
+        "rules": [
+          { "required": true, "message": "请再次输入管理密码" },
+          { "pattern": "^[\\s\\S]{8,128}$", "message": "管理密码长度需为 8 至 128 个字符" }
+        ]
+      }
+    ]
+  }
+]

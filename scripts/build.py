@@ -28,6 +28,8 @@ def stage_package(binary: Path, destination: Path):
     shutil.copyfile(ROOT / "THIRD_PARTY_NOTICES.md", destination / "app/THIRD_PARTY_NOTICES.md")
     shutil.copytree(ROOT / "licenses", destination / "app/licenses")
     for script in (destination / "cmd").iterdir():
+        # Windows checkouts may use CRLF, which breaks Linux shebangs.
+        script.write_bytes(script.read_bytes().replace(b"\r\n", b"\n"))
         script.chmod(0o755)
 
 
@@ -35,7 +37,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fnpack", type=Path, help="official fnpack executable")
     parser.add_argument("--stage-only", action="store_true", help="cross-compile and stage without invoking fnpack")
-    parser.add_argument("--wsl", action="store_true", help="run Linux fnpack in the existing Ubuntu WSL distribution (Windows only)")
+    parser.add_argument("--wsl", action="store_true", help="run Linux fnpack in an existing WSL distribution (Windows only)")
+    parser.add_argument("--wsl-distribution", default="Ubuntu", help="existing WSL distribution to use (default: Ubuntu)")
+    parser.add_argument("--wsl-temp-dir", default="/tmp", help="Linux temporary directory with enough space for fnpack (for example /dev/shm)")
     parser.add_argument("--output-dir", type=Path, help="build output directory inside the project (defaults to dist)")
     args = parser.parse_args()
     if os.name == "nt" and not args.stage_only and not args.wsl:
@@ -75,13 +79,16 @@ def main():
         for path in [stage, executable, output]:
             # WSL emits its own Windows-side diagnostics as UTF-16, while
             # wslpath writes UTF-8. Decode only the Linux path stream here.
-            translated = subprocess.run(["wsl", "--distribution", "Ubuntu", "--exec", "wslpath", "-a", str(path)], check=True, capture_output=True)
+            translated = subprocess.run(["wsl", "--distribution", args.wsl_distribution, "--exec", "wslpath", "-a", str(path)], check=True, capture_output=True)
             paths.append(translated.stdout.decode("utf8").strip())
         # Copy onto a Linux filesystem so tar receives real Unix mode bits.
-        script = """set -euo pipefail
-work=$(mktemp -d /tmp/panzhan-fpk.XXXXXX)
-cleanup() { case "$work" in /tmp/panzhan-fpk.*) rm -rf -- "$work" ;; esac; }
+        script = """set -eu
+temp_root=${4%/}
+[ -n "$temp_root" ] && [ -d "$temp_root" ]
+work=$(mktemp -d "$temp_root/panzhan-fpk.XXXXXX")
+cleanup() { case "$work" in "$temp_root"/panzhan-fpk.*) rm -rf -- "$work" ;; esac; }
 trap cleanup EXIT
+export TMPDIR="$work"
 mkdir "$work/package"
 cp -R -- "$1/." "$work/package/"
 find "$work/package" -type d -exec chmod 755 {} +
@@ -93,7 +100,7 @@ cd "$work"
 ./fnpack build --directory "$work/package"
 cp -- panzhan.fpk "$3/panzhan.fpk"
 """
-        packed = subprocess.run(["wsl", "--distribution", "Ubuntu", "--exec", "bash", "-s", "--", *paths], input=script.encode("utf8"), capture_output=True)
+        packed = subprocess.run(["wsl", "--distribution", args.wsl_distribution, "--exec", "sh", "-s", "--", *paths, args.wsl_temp_dir], input=script.encode("utf8"), capture_output=True)
         print(packed.stdout.decode("utf8", errors="replace"), end="")
         if packed.stderr:
             diagnostic_encoding = "utf-16-le" if b"\x00" in packed.stderr else "utf8"

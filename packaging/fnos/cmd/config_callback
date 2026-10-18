@@ -1,3 +1,10 @@
 #!/bin/bash
-# fnOS manages installation and shared-directory ACLs. Preserve all user data.
-exit 0
+set -euo pipefail
+script_dir=$(cd -- "$(dirname -- "$0")" && pwd)
+"$script_dir/install_callback"
+if ! "$script_dir/main" stop; then
+    rm -f -- "${TRIM_PKGVAR:?}/bootstrap-password"
+    echo "应用未能停止，密码尚未更新，请稍后重试。" >&2
+    exit 1
+fi
+"$script_dir/main" start

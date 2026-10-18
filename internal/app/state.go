@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"panzhan/internal/download"
 	"panzhan/internal/quark"
@@ -24,6 +25,7 @@ import (
 
 type Settings struct {
 	DefaultDir                string   `json:"default_dir"`
+	DownloadRoot              string   `json:"download_root,omitempty"`
 	Concurrency               int      `json:"concurrency"`
 	ChunkMiB                  int      `json:"chunk_mib"`
 	SearchPriorityConcurrency int      `json:"search_priority_concurrency"`
@@ -49,19 +51,21 @@ type Batch struct {
 	Done   bool     `json:"done"`
 }
 type Job struct {
-	ID         string       `json:"id"`
-	Title      string       `json:"title"`
-	Share      quark.Share  `json:"share"`
-	Directory  string       `json:"directory"`
-	Status     string       `json:"status"`
-	Error      string       `json:"error,omitempty"`
-	Created    string       `json:"created"`
-	CloudDir   string       `json:"cloud_dir"`
-	Original   []quark.File `json:"original"`
-	Batches    []Batch      `json:"batches"`
-	Files      []SavedFile  `json:"files"`
-	Enumerated bool         `json:"enumerated"`
-	Uncertain  bool         `json:"uncertain"`
+	ID           string        `json:"id"`
+	Title        string        `json:"title"`
+	Share        quark.Share   `json:"share"`
+	Directory    string        `json:"directory"`
+	DownloadRoot string        `json:"download_root,omitempty"`
+	Status       string        `json:"status"`
+	Error        string        `json:"error,omitempty"`
+	Created      string        `json:"created"`
+	CloudDir     string        `json:"cloud_dir"`
+	Original     []quark.File  `json:"original"`
+	Batches      []Batch       `json:"batches"`
+	Files        []SavedFile   `json:"files"`
+	Enumerated   bool          `json:"enumerated"`
+	Progress     *TaskProgress `json:"progress,omitempty"`
+	Uncertain    bool          `json:"uncertain"`
 }
 type State struct {
 	Version         int      `json:"version"`
@@ -78,13 +82,17 @@ type App struct {
 	state             State
 	dataDir, rootPath string
 	key               []byte
+	requestToken      string
 	sessions          map[string]session
 	failures          []time.Time
 	search            *search.Engine
 	newProvider       func(string, func(string)) *quark.Client
+	checkShare        func(context.Context, string) quark.ShareCheck
 	active            map[string]context.CancelFunc
+	transfers         map[string]*transferState
 	wake              chan struct{}
 	running           bool
+	diagnosing        bool
 }
 
 func randomID() string {
@@ -168,7 +176,9 @@ func New(dataDir, rootPath string) (*App, error) {
 	if err = os.MkdirAll(rootPath, 0750); err != nil {
 		return nil, err
 	}
-	a := &App{dataDir: dataDir, rootPath: rootPath, sessions: map[string]session{}, active: map[string]context.CancelFunc{}, wake: make(chan struct{}, 1), search: search.New(), newProvider: quark.New, state: State{Version: 1, Settings: Settings{Concurrency: 3, ChunkMiB: 10, SearchPriorityConcurrency: 3, SearchChannelConcurrency: 8, Sources: defaultSearchSources()}, Jobs: []Job{}}}
+	a := &App{dataDir: dataDir, rootPath: rootPath, sessions: map[string]session{}, active: map[string]context.CancelFunc{}, wake: make(chan struct{}, 1), search: search.New(), newProvider: quark.New, state: State{Version: 1, Settings: Settings{DownloadRoot: rootPath, Concurrency: 3, ChunkMiB: 10, SearchPriorityConcurrency: 3, SearchChannelConcurrency: 8, Sources: defaultSearchSources()}, Jobs: []Job{}}}
+	a.checkShare = quark.NewShareChecker().Check
+	a.requestToken = randomID() + randomID()
 	a.key, err = os.ReadFile(filepath.Join(dataDir, "master.key"))
 	newInstall := os.IsNotExist(err)
 	if err == nil {
@@ -205,6 +215,9 @@ func New(dataDir, rootPath string) (*App, error) {
 			return nil, errors.New("不支持的状态文件版本")
 		}
 		a.state.Settings.Sources = migrateSearchSources(a.state.Settings.Sources)
+		if a.state.Settings.DownloadRoot == "" {
+			a.state.Settings.DownloadRoot = rootPath
+		}
 		if a.state.Settings.SearchPriorityConcurrency == 0 {
 			a.state.Settings.SearchPriorityConcurrency = 3
 		}
@@ -221,9 +234,41 @@ func New(dataDir, rootPath string) (*App, error) {
 		if j.Status == "transferring" || j.Status == "downloading" || j.Status == "verifying" {
 			j.Status = "queued"
 		}
+		if j.DownloadRoot == "" {
+			j.DownloadRoot = rootPath
+		}
 	}
 	if err = a.saveLocked(); err != nil {
 		return nil, err
+	}
+	bootstrapPath := filepath.Join(dataDir, "bootstrap-password")
+	bootstrapPassword, bootstrapErr := os.ReadFile(bootstrapPath)
+	if bootstrapErr == nil {
+		password := strings.TrimSuffix(string(bootstrapPassword), "\n")
+		password = strings.TrimSuffix(password, "\r")
+		if passwordLength := utf8.RuneCountInString(password); passwordLength < 8 || passwordLength > 128 {
+			return nil, errors.New("飞牛安装或设置中的管理密码无效，请在应用中心重新配置")
+		}
+		// The package manager stages this file only after an explicit password
+		// choice in its install/config wizard. Apply that choice even if fnOS
+		// preserved an earlier state.json; leave every other state field intact.
+		if err = a.change(func(st *State) error {
+			st.Salt = randomID()
+			st.PasswordHash = passwordHash(password, st.Salt)
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		if err = os.Remove(bootstrapPath); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("无法清除安装向导中的临时密码：%w", err)
+		}
+		if a.isConfigured() {
+			if err = os.Remove(filepath.Join(dataDir, "setup-token.txt")); err != nil && !os.IsNotExist(err) {
+				return nil, fmt.Errorf("无法清除旧初始化令牌：%w", err)
+			}
+		}
+	} else if !os.IsNotExist(bootstrapErr) {
+		return nil, bootstrapErr
 	}
 	if !a.isConfigured() {
 		if _, err = os.Stat(filepath.Join(dataDir, "setup-token.txt")); os.IsNotExist(err) {
@@ -328,12 +373,21 @@ func (a *App) provider() (*quark.Client, error) {
 	}), nil
 }
 func (a *App) directory(rel string) (*os.Root, error) {
+	return a.directoryAt(a.rootPath, rel)
+}
+
+func (a *App) directoryAt(rootPath, rel string) (*os.Root, error) {
+	rootPath, err := filepath.Abs(rootPath)
+	if err != nil {
+		return nil, err
+	}
+	rootPath = filepath.Clean(rootPath)
 	if rel != "" {
 		if err := download.ValidatePath(rel); err != nil {
 			return nil, err
 		}
 	}
-	r, err := os.OpenRoot(a.rootPath)
+	r, err := os.OpenRoot(rootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -343,6 +397,46 @@ func (a *App) directory(rel string) (*os.Root, error) {
 	child, err := r.OpenRoot(filepath.FromSlash(rel))
 	r.Close()
 	return child, err
+}
+
+func validateDownloadRoot(rootPath string, writable bool) (string, error) {
+	if !filepath.IsAbs(rootPath) {
+		return "", errors.New("请输入 NAS 上的绝对共享目录路径")
+	}
+	rootPath, err := filepath.Abs(rootPath)
+	if err != nil {
+		return "", err
+	}
+	rootPath = filepath.Clean(rootPath)
+	r, err := os.OpenRoot(rootPath)
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+	f, err := r.Open(".")
+	if err != nil {
+		return "", err
+	}
+	info, statErr := f.Stat()
+	f.Close()
+	if statErr != nil || !info.IsDir() {
+		return "", errors.New("授权路径不是可读目录")
+	}
+	if writable {
+		name := ".panzhan-access-check-" + randomID()
+		probe, createErr := r.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+		if createErr != nil {
+			return "", errors.New("应用没有该目录的写入权限，请在飞牛应用设置中授予目录访问权限")
+		}
+		if err = probe.Close(); err != nil {
+			_ = r.Remove(name)
+			return "", err
+		}
+		if err = r.Remove(name); err != nil {
+			return "", errors.New("无法清理目录权限检查文件")
+		}
+	}
+	return rootPath, nil
 }
 func safeTitle(title string) string {
 	title = strings.TrimSpace(title)

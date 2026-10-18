@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
-import {mergeSearchResults} from '../internal/web/assets/search-results.mjs';
+import {mergeSearchResults,selectResults} from '../internal/web/assets/search-results.mjs';
 
 const source=await readFile(new URL('../internal/web/assets/app.js',import.meta.url),'utf8');
 const scheduler=source.slice(source.indexOf('function finishSearchIfIdle'),source.indexOf('function renderAuth'));
-function harness(){
+function harness({manualChecks=false}={}){
  const requests=[];
- const context=vm.createContext({AbortController,Map,Set,Date,setTimeout,clearTimeout,mergeSearchResults,renderSearch(){},localController:null,searchControllers:new Map(),state:{query:'',settings:{},sourceList:[{id:'a',name:'A',enabled:true}],results:[],report:[],searchRun:0},api(path,body,signal){return new Promise((resolve,reject)=>requests.push({path,body,signal,resolve,reject}));}});
+ const context=vm.createContext({AbortController,Map,Set,Date,setTimeout,clearTimeout,mergeSearchResults,selectResults,renderSearch(){},localController:null,checkControllers:new Set(),checkQueue:[],checkQueued:new Map(),searchControllers:new Map(),state:{query:'',settings:{},sourceList:[{id:'a',name:'A',enabled:true}],results:[],report:[],searchRun:0},api(path,body,signal){if(path==='search/check'&&!manualChecks)return Promise.resolve({checks:body.urls.map(url=>({url,availability:'accessible',checked_at:new Date().toISOString()}))});return new Promise((resolve,reject)=>requests.push({path,body,signal,resolve,reject}));}});
  vm.runInContext(scheduler,context);
  return {context,requests};
 }
@@ -42,4 +42,20 @@ test('pause during local lookup prevents remote scheduling until resumed',async(
  r[0].resolve({results:[]});await flush();assert.equal(r.length,1);
  c.resumeSearch();assert.equal(r.length,2);assert.equal(r[1].path,'search');
  c.cancelSearch();r[1].reject(Object.assign(new Error('abort'),{name:'AbortError'}));await flush();assert.equal(c.state.searchActive,0);
+});
+
+test('unverified links stay hidden, invalid links disappear and network uncertainty stays visible',async()=>{
+ const {context:c,requests:r}=harness({manualChecks:true});c.state.sourceList=[];c.beginSearch('资源');
+ r[0].resolve({results:['good','bad','uncertain'].map(id=>({title:id,url:`https://pan.quark.cn/s/${id}`}))});await flush();
+ assert.equal(selectResults(c.state.results).length,0);assert.equal(r[1].path,'search/check');assert.equal(c.state.searching,true);
+ r[1].resolve({checks:r[1].body.urls.map((url,i)=>({url,availability:['accessible','invalid','unknown'][i],checked_at:new Date().toISOString()}))});await flush();
+ assert.deepEqual(selectResults(c.state.results).map(r=>r.title),['good','uncertain']);assert.equal(c.state.searching,false);
+});
+
+test('a new query cancels validation and ignores stale responses',async()=>{
+ const {context:c,requests:r}=harness({manualChecks:true});c.state.sourceList=[];c.beginSearch('old');
+ r[0].resolve({results:[{title:'old',url:'https://pan.quark.cn/s/old'}]});await flush();const check=r[1];
+ c.beginSearch('new');assert.equal(check.signal.aborted,true);
+ check.resolve({checks:[{url:'https://pan.quark.cn/s/old',availability:'invalid'}]});await flush();
+ assert.equal(c.state.results.length,0);r[2].resolve({results:[]});await flush();assert.equal(c.state.searching,false);
 });

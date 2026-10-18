@@ -25,10 +25,36 @@ type Link struct {
 	URL    string
 	Header http.Header
 }
+
+// Only transient transport/body failures are retried. Invalid ranges, auth
+// failures and disk errors must still fail without writing unverified data.
+type retryableTransferError struct{ error }
+
+func retryTransfer(ctx context.Context, operation func() error) error {
+	for attempt := 0; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		err := operation()
+		var transient *retryableTransferError
+		if err == nil || !errors.As(err, &transient) || attempt >= 2 {
+			return err
+		}
+		timer := time.NewTimer((250 * time.Millisecond) << attempt)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
 type Engine struct {
 	HTTP        *http.Client
 	ChunkSize   int64
 	Concurrency int
+	Observe     func(Progress)
 }
 type journal struct {
 	Identity string         `json:"identity"`
@@ -169,6 +195,7 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 	if progress != nil {
 		progress(done)
 	}
+	tracker := newTransferTracker(size, done, e.Observe)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
@@ -184,7 +211,7 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
 		return errors.New("无效下载地址")
 	}
-	// Request the first missing chunk serially to detect servers that ignore Range.
+	// Check the first response headers before starting parallel Range readers.
 	var pending []int
 	for i := 0; i < count; i++ {
 		if _, ok := j.Parts[i]; !ok {
@@ -192,21 +219,39 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 		}
 	}
 	var mu sync.Mutex
-	writePart := func(i int, buf []byte) error {
-		mu.Lock()
-		defer mu.Unlock()
-		if _, er := f.WriteAt(buf, int64(i)*chunk); er != nil {
-			return er
+	dirtyParts := 0
+	checkpointLocked := func() error {
+		if dirtyParts == 0 {
+			return nil
 		}
+		// Flush file data before publishing the grouped recovery checkpoint.
 		if er := f.Sync(); er != nil {
 			return er
 		}
-		hash := sha256.Sum256(buf)
-		j.Parts[i] = hex.EncodeToString(hash[:])
 		if er := saveJournal(root, meta, j); er != nil {
 			return er
 		}
+		dirtyParts = 0
+		return nil
+	}
+	writePart := func(i int, buf []byte) error {
+		if _, er := f.WriteAt(buf, int64(i)*chunk); er != nil {
+			return er
+		}
+		hash := sha256.Sum256(buf)
+		mu.Lock()
+		defer mu.Unlock()
+		j.Parts[i] = hex.EncodeToString(hash[:])
+		dirtyParts++
 		done += int64(len(buf))
+		tracker.commit(i, int64(len(buf)))
+		// Group disk flushes instead of making every parallel reader wait for
+		// its own file and journal sync. Resume still re-hashes all saved parts.
+		if dirtyParts >= workers {
+			if er := checkpointLocked(); er != nil {
+				return er
+			}
+		}
 		if progress != nil {
 			progress(done)
 		}
@@ -230,7 +275,7 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 			if c.Err() != nil {
 				return nil, c.Err()
 			}
-			return nil, errors.New("下载网络异常，可重试以重新获取直链")
+			return nil, &retryableTransferError{errors.New("下载网络异常，分片重试后仍未恢复，可重试以重新获取直链")}
 		}
 		return res, nil
 	}
@@ -239,18 +284,58 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 		start := int64(i) * chunk
 		n := min(chunk, size-start)
 		want := fmt.Sprintf("bytes %d-%d/%d", start, start+n-1, size)
+		if res.StatusCode == 500 || res.StatusCode == 502 || res.StatusCode == 503 || res.StatusCode == 504 {
+			return &retryableTransferError{fmt.Errorf("下载服务暂时不可用（HTTP %d）", res.StatusCode)}
+		}
 		if res.StatusCode != 206 || res.Header.Get("Content-Range") != want {
 			return fmt.Errorf("分片响应不匹配（HTTP %d），未写入该分片", res.StatusCode)
 		}
-		buf, er := io.ReadAll(io.LimitReader(res.Body, n+1))
+		tracker.begin()
+		defer tracker.end()
+		buf, er := io.ReadAll(io.LimitReader(progressReader{res.Body, tracker, i}, n+1))
 		if er != nil || int64(len(buf)) != n {
-			return errors.New("分片长度不完整，可重试续传")
+			tracker.discard(i)
+			failure := errors.New("分片长度不完整，可重试续传")
+			if er != nil || int64(len(buf)) < n {
+				return &retryableTransferError{failure}
+			}
+			return failure
 		}
 		return writePart(i, buf)
 	}
+	fetchRange := func(c context.Context, i int, initial *http.Response) error {
+		defer func() {
+			if initial != nil {
+				initial.Body.Close()
+			}
+		}()
+		return retryTransfer(c, func() error {
+			res := initial
+			initial = nil
+			if res == nil {
+				var er error
+				res, er = request(c, i)
+				if er != nil {
+					return er
+				}
+			}
+			return readRange(res, i)
+		})
+	}
 	if len(pending) > 0 {
+		child, cancel := context.WithCancel(ctx)
+		defer cancel()
 		first := pending[0]
-		res, er := request(ctx, first)
+		var res *http.Response
+		er := retryTransfer(child, func() error {
+			var requestErr error
+			res, requestErr = request(child, first)
+			if requestErr == nil && (res.StatusCode == 500 || res.StatusCode == 502 || res.StatusCode == 503 || res.StatusCode == 504) {
+				res.Body.Close()
+				return &retryableTransferError{fmt.Errorf("下载服务暂时不可用（HTTP %d）", res.StatusCode)}
+			}
+			return requestErr
+		})
 		if er != nil {
 			return er
 		}
@@ -269,47 +354,64 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 				res.Body.Close()
 				return er
 			}
-			n, copyErr := io.CopyBuffer(f, io.LimitReader(res.Body, size+1), make([]byte, 256<<10))
+			tracker.reset()
+			if progress != nil {
+				progress(0)
+			}
+			tracker.begin()
+			n, copyErr := io.CopyBuffer(f, io.LimitReader(progressReader{res.Body, tracker, -1}, size+1), make([]byte, 256<<10))
 			res.Body.Close()
+			tracker.end()
 			if copyErr != nil || n != size {
+				tracker.discard(-1)
 				return errors.New("完整下载中断或长度不匹配；该服务器不支持分片续传")
 			}
 			if er = f.Sync(); er != nil {
 				return er
 			}
 			done = size
+			tracker.commit(-1, size)
 			if progress != nil {
 				progress(done)
 			}
 		} else {
-			if er = readRange(res, first); er != nil {
-				return er
+			start := int64(first) * chunk
+			n := min(chunk, size-start)
+			want := fmt.Sprintf("bytes %d-%d/%d", start, start+n-1, size)
+			if res.StatusCode != http.StatusPartialContent || res.Header.Get("Content-Range") != want {
+				return readRange(res, first)
 			}
 			pending = pending[1:]
-			child, cancel := context.WithCancel(ctx)
-			defer cancel()
 			jobs := make(chan int)
 			errCh := make(chan error, workers)
 			var wg sync.WaitGroup
 			for w := 0; w < workers; w++ {
+				var initial *http.Response
+				if w == 0 {
+					initial = res
+				}
 				wg.Add(1)
-				go func() {
+				go func(initial *http.Response) {
 					defer wg.Done()
+					if initial != nil {
+						if er := fetchRange(child, first, initial); er != nil {
+							errCh <- er
+							cancel()
+							return
+						}
+					}
 					for i := range jobs {
 						if child.Err() != nil {
 							return
 						}
-						r, er := request(child, i)
-						if er == nil {
-							er = readRange(r, i)
-						}
+						er := fetchRange(child, i, nil)
 						if er != nil {
 							errCh <- er
 							cancel()
 							return
 						}
 					}
-				}()
+				}(initial)
 			}
 			go func() {
 				defer close(jobs)
@@ -323,10 +425,20 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 			}()
 			wg.Wait()
 			close(errCh)
+			var workerErr error
 			for er := range errCh {
-				if er != nil {
-					return er
+				if er != nil && workerErr == nil {
+					workerErr = er
 				}
+			}
+			mu.Lock()
+			checkpointErr := checkpointLocked()
+			mu.Unlock()
+			if workerErr != nil {
+				return workerErr
+			}
+			if checkpointErr != nil {
+				return checkpointErr
 			}
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -336,6 +448,7 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 	if err = ctx.Err(); err != nil {
 		return err
 	}
+	tracker.phase("verifying")
 	if st, er := f.Stat(); er != nil || st.Size() != size {
 		return errors.New("文件大小校验失败")
 	}

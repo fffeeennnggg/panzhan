@@ -43,7 +43,7 @@ func run() error {
 	done := make(chan error, 1)
 	go func() { done <- server.Serve(listener) }()
 	fmt.Printf("盘栈已启动：http://%s\n", listener.Addr())
-	if _, err = os.Stat(filepath.Join(*data, "setup-token.txt")); err == nil {
+	if _, tokenErr := os.Stat(filepath.Join(*data, "setup-token.txt")); tokenErr == nil {
 		fmt.Printf("首次配置：从 %s 读取安装令牌。\n", filepath.Join(*data, "setup-token.txt"))
 	}
 	select {

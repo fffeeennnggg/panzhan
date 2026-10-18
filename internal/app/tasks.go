@@ -61,7 +61,16 @@ func (a *App) preview(ctx context.Context, raw, code string) (quark.Share, []qua
 	return s, fs, err
 }
 func (a *App) createJob(ctx context.Context, raw, title, dir, code string) (Job, error) {
-	r, err := a.directory(dir)
+	return a.createJobAt(ctx, raw, title, dir, code, a.rootPath)
+}
+
+func (a *App) createJobAt(ctx context.Context, raw, title, dir, code, downloadRoot string) (Job, error) {
+	var err error
+	downloadRoot, err = validateDownloadRoot(downloadRoot, true)
+	if err != nil {
+		return Job{}, err
+	}
+	r, err := a.directoryAt(downloadRoot, dir)
 	if err != nil {
 		return Job{}, fmt.Errorf("保存目录不可访问：%w", err)
 	}
@@ -82,7 +91,7 @@ func (a *App) createJob(ctx context.Context, raw, title, dir, code string) (Job,
 	}
 	title = safeTitle(title)
 	// Each task owns a distinct local/cloud directory; concurrent tasks cannot collide.
-	j := Job{ID: id, Title: title, Share: s, Directory: path.Join(dir, title+"-"+id[:8]), Status: "queued", Created: time.Now().Format(time.RFC3339), Original: files, Files: []SavedFile{}, Batches: []Batch{}}
+	j := Job{ID: id, Title: title, Share: s, Directory: path.Join(dir, title+"-"+id[:8]), DownloadRoot: downloadRoot, Status: "queued", Created: time.Now().Format(time.RFC3339), Original: files, Files: []SavedFile{}, Batches: []Batch{}}
 	err = a.change(func(st *State) error { st.Jobs = append([]Job{j}, st.Jobs...); return nil })
 	if err == nil {
 		a.signal()
@@ -107,7 +116,7 @@ func (a *App) Run(ctx context.Context) {
 		var next string
 		a.mu.Lock()
 		for _, j := range a.state.Jobs {
-			if j.Status == "queued" {
+			if !a.diagnosing && j.Status == "queued" {
 				next = j.ID
 				break
 			}
@@ -154,6 +163,8 @@ func (a *App) runJob(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
+	a.beginTransfer(id)
+	defer a.endTransfer(id)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -364,7 +375,11 @@ func (a *App) runJob(ctx context.Context, id string) error {
 		return err
 	}
 	j, _ = a.job(id)
-	root, err := os.OpenRoot(a.rootPath)
+	rootPath := j.DownloadRoot
+	if rootPath == "" {
+		rootPath = a.rootPath
+	}
+	root, err := os.OpenRoot(rootPath)
 	if err != nil {
 		return err
 	}
@@ -397,6 +412,8 @@ func (a *App) runJob(ctx context.Context, id string) error {
 			}
 			continue
 		}
+		a.beginTransferFile(id, i, item)
+		engine.Observe = func(p download.Progress) { a.observeTransfer(id, p) }
 		err = engine.Fetch(ctx, dest, item.Path, id+":"+item.ID, item.Size, item.MD5, func(ctx context.Context) (download.Link, error) {
 			link, er := c.DownloadLink(ctx, item.ID)
 			return download.Link{URL: link.URL, Header: link.Header}, er
@@ -501,7 +518,11 @@ func (a *App) action(ctx context.Context, id, action, dir string) error {
 		return nil
 	}
 	if dir != "" {
-		r, er := a.directory(dir)
+		rootPath := j.DownloadRoot
+		if rootPath == "" {
+			rootPath = a.rootPath
+		}
+		r, er := a.directoryAt(rootPath, dir)
 		if er != nil {
 			return er
 		}

@@ -108,14 +108,15 @@ func TestTaskPipelineSavesRealFileAndReusesTransferredIDs(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	a, err := New(t.TempDir(), t.TempDir())
+	defaultRoot, alternateRoot := t.TempDir(), t.TempDir()
+	a, err := New(t.TempDir(), defaultRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
 	a.newProvider = func(cookie string, cb func(string)) *quark.Client { return quark.NewAt(srv.URL, cookie, cb) }
 	cipher, _ := a.seal("cookie")
 	a.change(func(s *State) error { s.CookieCipher = cipher; return nil })
-	job, err := a.createJob(context.Background(), "https://pan.quark.cn/s/abcd", "Test", "", "")
+	job, err := a.createJobAt(context.Background(), "https://pan.quark.cn/s/abcd", "Test", "", "", alternateRoot)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,9 +127,12 @@ func TestTaskPipelineSavesRealFileAndReusesTransferredIDs(t *testing.T) {
 	for time.Now().Before(deadline) {
 		j, _ := a.job(job.ID)
 		if j.Status == "completed" {
-			data, er := os.ReadFile(filepath.Join(a.rootPath, j.Directory, "hello.txt"))
+			data, er := os.ReadFile(filepath.Join(alternateRoot, j.Directory, "hello.txt"))
 			if er != nil || string(data) != payload {
 				t.Fatal(er, string(data))
+			}
+			if j.DownloadRoot != alternateRoot {
+				t.Fatalf("task root was not persisted: %q", j.DownloadRoot)
 			}
 			if saved != 1 {
 				t.Fatal("duplicate save")

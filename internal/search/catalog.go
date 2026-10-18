@@ -142,6 +142,15 @@ func mergeResult(old, next Result) Result {
 	if old.CheckedAt > next.CheckedAt {
 		next.CheckedAt = old.CheckedAt
 		next.Availability = old.Availability
+		next.CheckMessage = old.CheckMessage
+		next.FileCount = old.FileCount
+		next.Content = old.Content
+	}
+	// A corrected extraction code needs a new check; a previous password failure
+	// must not poison this candidate's verification cache.
+	if newShare.Code != "" && newShare.Code != oldShare.Code && next.Availability != "invalid" {
+		next.CheckedAt, next.Availability, next.CheckMessage, next.FileCount = "", "unknown", "", 0
+		next.Content = nil
 	}
 	return next
 }
@@ -252,6 +261,12 @@ func (c *Catalog) Search(query string, enabled []string) []Result {
 		return out
 	}
 	for _, r := range c.items {
+		if r.Availability == "invalid" {
+			checked, _ := time.Parse(time.RFC3339Nano, r.CheckedAt)
+			if c.now().Sub(checked) < 10*time.Minute {
+				continue
+			}
+		}
 		origins := []Origin{}
 		for _, o := range r.Origins {
 			if slices.Contains(enabled, o.ID) {

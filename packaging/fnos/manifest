@@ -1,5 +1,5 @@
 appname=panzhan
-version=0.1.0
+version=0.1.5
 display_name=盘栈
 desc=独立搜索、夸克转存与NAS下载单进程应用，无需其他服务。
 platform=x86
@@ -12,4 +12,4 @@ service_port=9867
 checkport=true
 ctl_stop=true
 disable_authorization_path=false
-changelog=首次发布：原生 Linux x86_64 单进程应用。
+changelog=优化下载首片并发与批量同步，增加临时分片故障重试及限时 NAS 原机测速。

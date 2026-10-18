@@ -1,3 +1,18 @@
 #!/bin/bash
-# fnOS manages installation and shared-directory ACLs. Preserve all user data.
+# Store the wizard-selected password for one-time consumption by the service.
+set -euo pipefail
+umask 077
+[ -n "${TRIM_PKGVAR:-}" ] && [ -d "$TRIM_PKGVAR" ] || { echo "应用数据目录不可用。" >&2; exit 1; }
+password=${wizard_admin_password:-}
+confirmation=${wizard_admin_password_confirm:-}
+# The service validates the exact Unicode character count. This byte bound
+# accommodates 128 UTF-8 characters even on systems without a UTF-8 locale.
+[ "${#password}" -ge 8 ] && [ "${#password}" -le 512 ] || { echo "管理密码长度无效。" >&2; exit 1; }
+[ "$password" = "$confirmation" ] || { echo "两次输入的管理密码不一致。" >&2; exit 1; }
+secret=$(mktemp "$TRIM_PKGVAR/.bootstrap-password.XXXXXX")
+trap 'rm -f -- "$secret"' EXIT
+printf '%s\n' "$password" > "$secret"
+chmod 600 "$secret"
+mv -f -- "$secret" "$TRIM_PKGVAR/bootstrap-password"
+trap - EXIT
 exit 0
