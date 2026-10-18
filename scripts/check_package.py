@@ -14,11 +14,22 @@ import sys
 import tarfile
 import tempfile
 import unittest
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class BuildTests(unittest.TestCase):
+
+    def test_agent_bundle_matches_current_public_sources(self):
+        location = ROOT / "scripts/build_agent_kit.py"
+        spec = importlib.util.spec_from_file_location("agent_kit_builder", location)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with zipfile.ZipFile(ROOT / "internal/web/assets/agent-kit.zip") as bundle:
+            self.assertEqual(sorted(bundle.namelist()), sorted(module.FILES))
+            for name in module.FILES:
+                self.assertEqual(bundle.read(name), (ROOT / name).read_bytes().replace(b'\r\n', b'\n'))
     @classmethod
     def setUpClass(cls):
         (ROOT / ".cache").mkdir(exist_ok=True)

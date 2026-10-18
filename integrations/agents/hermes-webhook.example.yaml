@@ -1,0 +1,20 @@
+# Merge into the existing Hermes config. Set WEBHOOK_SECRET in Hermes's
+# environment to the same value as the relay's PANZHAN_DELIVERY_SECRET.
+platforms:
+  webhook:
+    enabled: true
+    extra:
+      host: 127.0.0.1
+      port: 8644
+      routes:
+        panzhan:
+          events:
+            - panzhan.task.completed
+            - panzhan.task.attention
+            - panzhan.task.cancelled
+          prompt: "{message}"
+          deliver: weixin
+          deliver_only: true
+          mirror_to_session: true
+          deliver_extra:
+            chat_id: "{chat_id}"

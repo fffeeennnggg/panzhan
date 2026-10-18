@@ -66,15 +66,23 @@ type Job struct {
 	Enumerated   bool          `json:"enumerated"`
 	Progress     *TaskProgress `json:"progress,omitempty"`
 	Uncertain    bool          `json:"uncertain"`
+	AgentID      string        `json:"agent_id,omitempty"`
+	AgentContext string        `json:"agent_context,omitempty"`
+	AgentRequest string        `json:"agent_request,omitempty"`
+	AgentChoice  string        `json:"agent_choice,omitempty"`
 }
 type State struct {
-	Version         int      `json:"version"`
-	Salt            string   `json:"salt"`
-	PasswordHash    string   `json:"password_hash"`
-	CookieCipher    string   `json:"cookie_cipher"`
-	AccountRevision uint64   `json:"account_revision"`
-	Settings        Settings `json:"settings"`
-	Jobs            []Job    `json:"jobs"`
+	Version         int           `json:"version"`
+	Salt            string        `json:"salt"`
+	PasswordHash    string        `json:"password_hash"`
+	CookieCipher    string        `json:"cookie_cipher"`
+	AccountRevision uint64        `json:"account_revision"`
+	Settings        Settings      `json:"settings"`
+	Jobs            []Job         `json:"jobs"`
+	Agents          []AgentGrant  `json:"agents,omitempty"`
+	AgentChoices    []AgentChoice `json:"agent_choices,omitempty"`
+	AgentEvents     []AgentEvent  `json:"agent_events,omitempty"`
+	AgentEventSeq   uint64        `json:"agent_event_seq,omitempty"`
 }
 type session struct{ expires time.Time }
 type App struct {
@@ -93,6 +101,7 @@ type App struct {
 	wake              chan struct{}
 	running           bool
 	diagnosing        bool
+	agentMu           sync.Mutex
 }
 
 func randomID() string {
@@ -297,12 +306,18 @@ func (a *App) change(fn func(*State) error) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	old, _ := json.Marshal(a.state)
+	restore := func() { var previous State; _ = json.Unmarshal(old, &previous); a.state = previous }
+	previousJobs := make(map[string]string, len(a.state.Jobs))
+	for _, job := range a.state.Jobs {
+		previousJobs[job.ID] = job.Status
+	}
 	if err := fn(&a.state); err != nil {
-		_ = json.Unmarshal(old, &a.state)
+		restore()
 		return err
 	}
+	appendAgentEvents(&a.state, previousJobs)
 	if err := a.saveLocked(); err != nil {
-		_ = json.Unmarshal(old, &a.state)
+		restore()
 		return errors.New("本地状态保存失败，操作未提交")
 	}
 	return nil

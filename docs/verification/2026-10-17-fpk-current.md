@@ -1,5 +1,9 @@
 # 当前版本飞牛安装包
 
+当前交付版本为 **0.2.0**，安装包 `dist/panzhan-0.2.0.fpk`，大小 17,012,636 字节，SHA-256 为 `f4e83d0a228f48960c9314a2aa7846f2025a747cadc823f9fd60edb6c1457992`。包含通用 Agent MCP/API、独立授权、幂等后台下载和完成通知事件，详见 [0.2.0 验证记录](2026-10-18-agent-integration.md)。已通过包体校验和原生 Linux 启停验证；尚未在用户真实 Agent/微信网关部署联调。
+
+## 历史构建记录：0.1.5
+
 当前验证版本：0.1.5，目标 fnOS x86_64。安装包为 `dist/panzhan-0.1.5-download-test.fpk`（独立构建目录：`dist/speed-0.1.5/panzhan.fpk`），16,929,746 字节，SHA-256 为 `abfe8a7ddd7e722b246fec0f4a2cdfd46887e70d7b3e35f0f482bd6c757627c1`。
 
 2026-10-18 已通过 Go 全量测试、改动包静态检查、17 项前端逻辑测试和 FPK checksum/ELF/执行位检查。包结构自测共 6 项，Windows 支持的 3 项通过、依赖 Linux 的 3 项跳过。用户已在飞牛覆盖安装 0.1.5，并完成真实夸克文件的限时网络接收及临时写盘同步验证，详情见 [下载速度实验](../research/2026-10-17-download-speed-experiments.md)。包中不包含账号、管理密码或本机任务数据。

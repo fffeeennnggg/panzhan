@@ -39,6 +39,10 @@ func (a *App) Handler() http.Handler {
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'")
+		if r.URL.Path == "/mcp" || strings.HasPrefix(r.URL.Path, "/api/agent/v1/") {
+			a.agentHandler(w, r)
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/api/") {
 			w.Header().Set("Cache-Control", "no-store")
 			if r.Method != "GET" {
@@ -57,7 +61,7 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 	ok := func(v any) { writeJSON(w, 200, v) }
 	path := r.URL.Path
 	if path == "/api/status" && r.Method == "GET" {
-		ok(map[string]any{"configured": a.isConfigured(), "authenticated": a.authenticated(r), "version": "0.1.5", "request_token": a.requestToken})
+		ok(map[string]any{"configured": a.isConfigured(), "authenticated": a.authenticated(r), "version": "0.2.0", "request_token": a.requestToken})
 		return
 	}
 	if (path == "/api/setup" || path == "/api/login") && r.Method == "POST" {
@@ -122,12 +126,14 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case path == "/api/agents" || strings.HasPrefix(path, "/api/agents/"):
+		a.agentAdmin(w, r)
 	case path == "/api/settings" && r.Method == "GET":
 		settings := a.snapshot().Settings
 		if settings.DownloadRoot == "" {
 			settings.DownloadRoot = a.rootPath
 		}
-		ok(map[string]any{"settings": settings, "root": a.rootPath, "version": "0.1.5"})
+		ok(map[string]any{"settings": settings, "root": a.rootPath, "version": "0.2.0"})
 	case path == "/api/settings" && r.Method == "POST":
 		var in Settings
 		if err := body(r, &in); err != nil {

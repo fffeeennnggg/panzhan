@@ -50,6 +50,8 @@ def main():
     if not output.is_relative_to(ROOT):
         raise ValueError("build output must remain inside the project")
     output.mkdir(exist_ok=True)
+    # Generated from checked-in templates; never include environment or runtime data.
+    subprocess.run([os.sys.executable, "-X", "utf8", str(ROOT / "scripts/build_agent_kit.py")], cwd=ROOT, check=True)
     binary = output / "panzhan-linux-amd64"
     env = os.environ.copy()
     env.update(GOOS="linux", GOARCH="amd64", CGO_ENABLED="0")

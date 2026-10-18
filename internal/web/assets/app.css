@@ -104,5 +104,15 @@ dialog{overscroll-behavior:contain;scrollbar-gutter:stable}
 .source-option>span{min-width:0;overflow-wrap:anywhere}
 .source-option strong{display:block;font-size:14px;font-weight:500}
 .source-option small{display:block;font-size:13px;line-height:1.7;color:var(--muted)}
+[data-agent-access]{margin-top:28px;min-width:0}
+.agent-access .summary{margin:22px 0}.agent-access form{margin:24px 0}
+.agent-permission{display:flex;align-items:flex-start;gap:12px;margin:20px 0;cursor:pointer}
+.agent-permission input{width:18px;height:18px;margin-top:4px;flex:none;accent-color:var(--accent)}
+.agent-permission strong,.agent-permission small{display:block}.agent-permission small{margin-top:5px;color:var(--muted);line-height:1.7}
+.agent-secret{margin:24px 0;padding:24px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.agent-secret textarea{width:100%;max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;resize:vertical;font:13px/1.8 ui-monospace,monospace}
+.agent-connection{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:22px 0;border-top:1px solid var(--line)}
+.agent-connection>div{min-width:0}.agent-connection h3{font-size:16px}.agent-connection .path{overflow-wrap:anywhere;white-space:normal}
+.agent-connection button{flex:none}@media(max-width:560px){.agent-connection{flex-direction:column;gap:12px}.agent-secret{padding:18px}}
 @media(max-width:1100px){.source-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.source-plan,.source-choice-group{padding:23px 20px}.source-plan-top{gap:12px;align-items:flex-start}.source-save-state{min-width:5em}.source-choice-heading{align-items:flex-start;flex-direction:column;gap:13px}.source-options{grid-template-columns:minmax(0,1fr)}.source-group-actions{width:100%}.source-presets{gap:6px}.source-presets button{font-size:13px;padding:10px 12px}.source-plan-top strong{font-size:29px}}

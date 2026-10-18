@@ -28,6 +28,17 @@ const {chromium}=require(process.env.PANZHAN_PLAYWRIGHT||'C:/Users/10496/.cache/
   await page.getByRole('button',{name:'查看详情',exact:true}).click();tasks[0].status='completed';tasks[0].files[0].done=true;await page.waitForTimeout(2900);assert.equal(await page.locator('dialog .badge').textContent(),'已完成','open task details must update');await page.keyboard.press('Escape');
   tasks[0].status='attention';await page.waitForTimeout(2900);assert.equal(await page.locator('#main .badge').textContent(),'需要处理','closing details must not stall list polling');
   const pages=['search','tasks','account','sources','settings'];
+  await page.getByRole('link',{name:'设置',exact:true}).click();
+  await page.locator('#agent-grant-form [name=agent_name]').fill('Offline MCP agent');
+  await page.getByRole('button',{name:'创建授权',exact:true}).click();
+  const agentToken=await page.getByRole('textbox',{name:'Agent 访问令牌',exact:true}).inputValue();assert.ok(agentToken.startsWith('pz_agent_'));
+  assert.equal(await page.locator('.agent-connection').count(),1);
+  assert.ok(await page.getByRole('link',{name:'下载 Agent 接入包',exact:true}).isVisible());
+  const readonly=await page.request.post(origin+'/api/agent/v1/downloads',{headers:{Authorization:'Bearer '+agentToken},data:{choice_id:'fixture',request_id:'fixture',user_confirmed:true}});assert.equal(readonly.status(),403);
+  await page.getByRole('button',{name:'已保存，隐藏令牌',exact:true}).click();assert.equal(await page.getByRole('textbox',{name:'Agent 访问令牌',exact:true}).count(),0);
+  await page.getByRole('button',{name:'撤销授权',exact:true}).click();await page.locator('dialog').getByRole('button',{name:'撤销授权',exact:true}).click();await page.locator('.agent-connection').getByText(/已撤销/).waitFor();
+  const revoked=await page.request.get(origin+'/api/agent/v1/status',{headers:{Authorization:'Bearer '+agentToken}});assert.equal(revoked.status(),401);
+  await page.screenshot({path:path.join(temp,'agent-access-desktop.png'),fullPage:true});await page.setViewportSize({width:360,height:900});await page.screenshot({path:path.join(temp,'agent-access-mobile.png'),fullPage:true});
   for(const width of [1024,720,360,320]){await page.setViewportSize({width,height:900});for(const name of pages){await page.locator(`.main-nav [data-page=${name}]`).click();const bounds=await page.evaluate(()=>({w:document.documentElement.scrollWidth,c:document.documentElement.clientWidth}));assert.ok(bounds.w<=bounds.c,`${name} overflow at ${width}: ${JSON.stringify(bounds)}`);}}
   await page.setViewportSize({width:1024,height:900});await page.getByRole('link',{name:'资源搜索',exact:true}).click();await page.screenshot({path:path.join(temp,'desktop.png'),fullPage:true});await page.setViewportSize({width:360,height:900});await page.screenshot({path:path.join(temp,'mobile.png'),fullPage:true});assert.deepEqual(errors,[]);
   const cookies=await page.context().cookies();const session=cookies.find(c=>c.name==='panzhan_session');assert.ok(session.httpOnly);console.log(JSON.stringify({ok:true,pages:5,widths:[1024,720,360,320],flows:['setup','credential-save','directory-select','multi-source-search','pause-resume','partial-source-error','share-preview','task-create','task-detail','escape-close'],screenshots:temp,pageErrors:errors,scope:'Local API and browser fixtures only; no live cloud requests.'},null,2));

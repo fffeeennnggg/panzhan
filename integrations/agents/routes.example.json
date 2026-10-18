@@ -1,0 +1,7 @@
+{
+  "wechat:owner": {
+    "channel": "weixin",
+    "to": "REPLACE_WITH_YOUR_CHAT_ID",
+    "agent_id": "main"
+  }
+}

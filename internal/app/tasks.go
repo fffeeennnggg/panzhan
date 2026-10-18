@@ -65,6 +65,12 @@ func (a *App) createJob(ctx context.Context, raw, title, dir, code string) (Job,
 }
 
 func (a *App) createJobAt(ctx context.Context, raw, title, dir, code, downloadRoot string) (Job, error) {
+	return a.createAgentJob(ctx, raw, title, dir, code, downloadRoot, agentJobMeta{})
+}
+
+type agentJobMeta struct{ GrantID, Context, RequestID, ChoiceID string }
+
+func (a *App) createAgentJob(ctx context.Context, raw, title, dir, code, downloadRoot string, meta agentJobMeta) (Job, error) {
 	var err error
 	downloadRoot, err = validateDownloadRoot(downloadRoot, true)
 	if err != nil {
@@ -92,7 +98,28 @@ func (a *App) createJobAt(ctx context.Context, raw, title, dir, code, downloadRo
 	title = safeTitle(title)
 	// Each task owns a distinct local/cloud directory; concurrent tasks cannot collide.
 	j := Job{ID: id, Title: title, Share: s, Directory: path.Join(dir, title+"-"+id[:8]), DownloadRoot: downloadRoot, Status: "queued", Created: time.Now().Format(time.RFC3339), Original: files, Files: []SavedFile{}, Batches: []Batch{}}
-	err = a.change(func(st *State) error { st.Jobs = append([]Job{j}, st.Jobs...); return nil })
+	j.AgentID, j.AgentContext, j.AgentRequest, j.AgentChoice = meta.GrantID, meta.Context, meta.RequestID, meta.ChoiceID
+	err = a.change(func(st *State) error {
+		if meta.GrantID != "" {
+			if !liveAgentScope(st, meta.GrantID, "downloads:create") {
+				return errors.New("Agent 授权已失效或没有下载权限")
+			}
+			found := false
+			for i := range st.AgentChoices {
+				c := &st.AgentChoices[i]
+				if c.ID == meta.ChoiceID && c.GrantID == meta.GrantID && c.TaskID == "" && time.Now().Before(c.Expires) {
+					c.TaskID = j.ID
+					found = true
+					break
+				}
+			}
+			if !found {
+				return errors.New("资源选择已过期或已创建任务，请重新预览")
+			}
+		}
+		st.Jobs = append([]Job{j}, st.Jobs...)
+		return nil
+	})
 	if err == nil {
 		a.signal()
 	}

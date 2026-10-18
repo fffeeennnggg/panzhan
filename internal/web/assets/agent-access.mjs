@@ -1,0 +1,13 @@
+const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+export function agentAccessHTML(agents=[],fresh=null,root='',directory='',origin=''){
+ const endpoint=origin+'/mcp';
+ return `<section class="section agent-access"><div class="between"><div><h2>Agent 授权</h2><p class="sub">让 OpenClaw、Hermes 或其他支持 MCP 的助手调用盘栈。同机和其他机器使用同一套接口。</p></div></div>
+ <div class="summary"><p>MCP 地址</p><p class="path">${esc(endpoint)}</p><p class="sub">其他机器需使用可访问的 NAS 地址；容器中的 127.0.0.1 指向容器自身。</p><p class="sub"><a href="/agent-kit.zip" download>下载 Agent 接入包</a> · 含两种 Agent 的配置示例、通知监听器和操作说明。监听器在 Agent 主机运行，盘栈服务本身不依赖 Python。</p></div>
+ <form id="agent-grant-form"><div class="form-grid"><label class="field">授权名称<input name="agent_name" required maxlength="120" autocomplete="off" placeholder="例如：微信上的 Hermes"></label><label class="field">有效期<select name="agent_days"><option value="7">7 天</option><option value="30">30 天</option><option value="90" selected>90 天</option><option value="365">365 天</option></select></label></div>
+ <label class="field">授权子目录<input name="agent_directory" value="${esc(directory)}" autocomplete="off" spellcheck="false" placeholder="留空使用已保存的默认目录"><small>基于已保存的共享目录：${esc(root)}。只能选择其中已有的子目录。</small></label>
+ <label class="agent-permission"><input type="checkbox" name="allow_download"><span><strong>允许创建后台下载</strong><small>始终允许搜索、预览和查询此授权的任务；勾选后可在聊天中确认下载。</small></span></label>
+ <div class="actions"><button class="primary" type="submit">创建授权</button></div><p class="login-error" role="alert" tabindex="-1"></p></form>
+ ${fresh?`<div class="agent-secret" role="status"><h3>请立即保存访问令牌</h3><p class="sub">完整令牌只在创建时返回。把它配置到对应 Agent 的 Authorization: Bearer 请求头，不要把管理密码或夸克 Cookie 交给 Agent。</p><label class="field">Agent 访问令牌<textarea readonly rows="3" spellcheck="false" autocomplete="off">${esc(fresh.token)}</textarea></label><button type="button" data-action="hide-agent-token">已保存，隐藏令牌</button></div>`:''}
+ <div class="agent-connections">${agents.length?agents.map(agent=>`<article class="agent-connection"><div><h3>${esc(agent.name)}</h3><p class="sub">${agent.active?'已授权':agent.revoked?'已撤销':'已过期'} · ${agent.scopes.includes('downloads:create')?'搜索与后台下载':'搜索与只读查询'} · 有效至 ${esc(String(agent.expires_at).slice(0,10))}</p><p class="path">${esc(agent.download_root)}${agent.directory?'/'+esc(agent.directory):''}</p></div>${agent.active?`<button type="button" data-revoke-agent="${esc(agent.id)}">撤销授权</button>`:''}</article>`).join(''):'<p class="sub">尚未授权任何 Agent。每台 Agent 建议单独创建授权，方便撤销与隔离任务。</p>'}</div>
+ <p class="sub">后台通知需在 Agent 主机运行配套事件监听器。盘栈保留未确认的完成或失败事件，断线后可继续补取；微信收发由 Agent 的微信网关负责。</p></section>`;
+}

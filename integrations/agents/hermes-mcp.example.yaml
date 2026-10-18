@@ -1,0 +1,6 @@
+mcp_servers:
+  panzhan:
+    url: http://127.0.0.1:9867/mcp
+    headers:
+      Authorization: "Bearer ${PANZHAN_AGENT_TOKEN}"
+    timeout: 120

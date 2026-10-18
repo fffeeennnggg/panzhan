@@ -1,0 +1,14 @@
+{
+  "mcp": {
+    "servers": {
+      "panzhan": {
+        "url": "http://127.0.0.1:9867/mcp",
+        "transport": "streamable-http",
+        "headers": { "Authorization": "Bearer ${PANZHAN_AGENT_TOKEN}" },
+        "connectionTimeoutMs": 5000,
+        "requestTimeoutMs": 120000,
+        "enabled": true
+      }
+    }
+  }
+}
