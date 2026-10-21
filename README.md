@@ -4,7 +4,7 @@
 
 **当前版本：0.2.2。** 主要面向飞牛 fnOS x86_64；仓库也提供绿联 UGOS Pro ARM64 的 Docker 部署文件。项目采用 AGPL-3.0，第三方代码与资源的来源及许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-飞牛用户可直接在 [Releases](https://github.com/fffeeennnggg/fn/releases/latest) 下载已打包的 `.fpk` 安装包，通过应用中心手动安装；源码构建方法见下文。
+飞牛用户可直接在 [Releases](https://github.com/fffeeennnggg/panzhan/releases/latest) 下载已打包的 `.fpk` 安装包，通过应用中心手动安装；源码构建方法见下文。
 
 ## 功能
 
@@ -61,8 +61,8 @@
 需要 Git 和 Go 1.26 或更新版本：
 
 ```sh
-git clone https://github.com/fffeeennnggg/fn.git
-cd fn
+git clone https://github.com/fffeeennnggg/panzhan.git
+cd panzhan
 go run ./cmd/panzhan -listen 127.0.0.1:9867 -data ./data -root ./downloads
 ```
 

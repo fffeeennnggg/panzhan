@@ -19,7 +19,7 @@ For a named profile, in the same shell set `profile` to its name and confirm its
 If the repository is available to Hermes through GitHub, install the repository path with Hermes' Skills command:
 
 ```sh
-hermes skills install fffeeennnggg/fn/integrations/agents/panzhan
+hermes skills install fffeeennnggg/panzhan/integrations/agents/panzhan
 ```
 
 For a private repository, Hermes needs GitHub access through its own `GITHUB_TOKEN`; do not send that token to the PanZhan Skill. If Hermes cannot access the repository, use the local copy method. After installation, start a new chat session or run `/reset` so the skill appears in the current session.
