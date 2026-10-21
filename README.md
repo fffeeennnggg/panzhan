@@ -4,6 +4,8 @@
 
 **当前版本：0.2.2。** 主要面向飞牛 fnOS x86_64；仓库也提供绿联 UGOS Pro ARM64 的 Docker 部署文件。项目采用 AGPL-3.0，第三方代码与资源的来源及许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
+飞牛用户可直接在 [Releases](https://github.com/fffeeennnggg/fn/releases/latest) 下载已打包的 `.fpk` 安装包，通过应用中心手动安装；源码构建方法见下文。
+
 ## 功能
 
 - 聚合网页来源、Telegram 公开频道和 PanSou 插件搜索夸克分享，并检查分享状态。
@@ -13,6 +15,36 @@
 - 提供范围受限的 MCP 与 HTTP API，供 OpenClaw、Hermes 等 Agent 搜索、预览和创建下载任务。
 
 搜索结果仅保留夸克分享。部分搜索来源需要额外配置或受网络环境影响，可在“搜索来源”页面查看状态；标题中的清晰度等标签不代表已检验文件实际质量。
+
+## 界面预览
+
+以下截图展示 0.2.2 版本的实际网页界面。资源名称、文件列表、路径、任务进度和速度均为示例数据，未连接真实网盘账号；下载速度不代表实际性能。
+
+**资源搜索**：查看聚合搜索结果、分享状态、文件类型与大小，选择资源后预览分享内容。
+
+![盘栈资源搜索界面，展示 Blender 示例资源与文件信息](docs/images/search.png)
+
+**下载任务**：查看任务状态、进度和速度，并按需暂停、继续或取消任务。
+
+![盘栈下载任务界面，展示下载中、已完成和已暂停的示例任务](docs/images/tasks.png)
+
+<details>
+<summary>展开查看：分享预览与转存</summary>
+
+预览分享中的目录和文件，确认 NAS 保存目录后转存并下载当前分享目录。
+
+![盘栈分享预览窗口，展示示例文件列表与转存操作](docs/images/share-preview.png)
+
+</details>
+
+<details>
+<summary>展开查看：下载位置与参数设置</summary>
+
+选择 NAS 授权保存目录，设置搜索并发、单文件并发和分片大小。
+
+![盘栈设置界面，展示 NAS 保存位置、搜索并发与下载参数](docs/images/settings.png)
+
+</details>
 
 ## 平台支持
 
