@@ -1,0 +1,17 @@
+services:
+  panzhan:
+    image: panzhan:0.2.2-arm64
+    platform: linux/arm64
+    container_name: panzhan
+    restart: always
+    ports:
+      - "9867:9867"
+    volumes:
+      - ./data:/data
+      - ./downloads:/downloads
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 25s

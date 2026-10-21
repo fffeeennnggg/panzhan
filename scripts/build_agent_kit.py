@@ -7,6 +7,8 @@ FILES=[
     'docs/agent-integration.md',
     'scripts/agent_event_relay.py',
     'integrations/agents/AGENT-INSTRUCTIONS.md',
+    'integrations/agents/panzhan/SKILL.md',
+    'integrations/agents/panzhan/README.md',
     'integrations/agents/openclaw-mcp.example.json',
     'integrations/agents/hermes-mcp.example.yaml',
     'integrations/agents/hermes-webhook.example.yaml',

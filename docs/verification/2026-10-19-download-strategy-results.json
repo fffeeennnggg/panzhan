@@ -1,0 +1,1286 @@
+{
+  "date": "2026-10-19",
+  "project": "Panzhan",
+  "platform": "Windows, Go 1.26.4, Python 3.14",
+  "scope": "Actual internal/download.Engine.Fetch with isolated experimental transport; no production or NAS deployment",
+  "network": {
+    "physical_interface": "以太网 2",
+    "if_index": 8,
+    "link_speed_mbps": 100,
+    "theoretical_mib_s": 11.920928955078125,
+    "total_nic_traffic_sampled": false
+  },
+  "method": {
+    "timer": "Python time.monotonic outside downloader process",
+    "same_account_and_cloud_file": true,
+    "link_refreshed_once_per_cohort_process": true,
+    "fresh_transport_and_directory_each_case": true,
+    "partial_download_only": true,
+    "full_file_integrity_verified": false,
+    "cap_application_mib_per_case": 192,
+    "screening_repeated_range_counter_available": false,
+    "confirmation_repeated_range_counter_available": true
+  },
+  "valid_windows": 29,
+  "total_application_bytes_valid_cohorts": 2882012380,
+  "summary": {
+    "screening": {
+      "baseline": {
+        "n": 6,
+        "median_mib_s": 10.452720614731644,
+        "min_mib_s": 4.754788227568406,
+        "max_mib_s": 11.003889046395301
+      },
+      "h1-3": {
+        "n": 1,
+        "median_mib_s": 11.19145772196984,
+        "min_mib_s": 11.19145772196984,
+        "max_mib_s": 11.19145772196984
+      },
+      "auto-8": {
+        "n": 1,
+        "median_mib_s": 11.18085868609128,
+        "min_mib_s": 11.18085868609128,
+        "max_mib_s": 11.18085868609128
+      },
+      "h1-8": {
+        "n": 1,
+        "median_mib_s": 11.265019587465822,
+        "min_mib_s": 11.265019587465822,
+        "max_mib_s": 11.265019587465822
+      },
+      "h1-16": {
+        "n": 1,
+        "median_mib_s": 11.155467872669517,
+        "min_mib_s": 11.155467872669517,
+        "max_mib_s": 11.155467872669517
+      },
+      "h1-32": {
+        "n": 1,
+        "median_mib_s": 11.13094046122142,
+        "min_mib_s": 11.13094046122142,
+        "max_mib_s": 11.13094046122142
+      },
+      "h1-64": {
+        "n": 1,
+        "median_mib_s": 11.232699431579237,
+        "min_mib_s": 11.232699431579237,
+        "max_mib_s": 11.232699431579237
+      },
+      "auto-32": {
+        "n": 1,
+        "median_mib_s": 11.163077079339773,
+        "min_mib_s": 11.163077079339773,
+        "max_mib_s": 11.163077079339773
+      },
+      "h1-16-chunk1": {
+        "n": 1,
+        "median_mib_s": 11.142856469881945,
+        "min_mib_s": 11.142856469881945,
+        "max_mib_s": 11.142856469881945
+      },
+      "h1-16-chunk5": {
+        "n": 1,
+        "median_mib_s": 11.230751822344635,
+        "min_mib_s": 11.230751822344635,
+        "max_mib_s": 11.230751822344635
+      },
+      "h1-16-chunk20": {
+        "n": 1,
+        "median_mib_s": 11.139592916638398,
+        "min_mib_s": 11.139592916638398,
+        "max_mib_s": 11.139592916638398
+      }
+    },
+    "confirmation": {
+      "baseline": {
+        "n": 3,
+        "median_mib_s": 10.837927066574618,
+        "min_mib_s": 9.592664056984729,
+        "max_mib_s": 11.1725895357659
+      },
+      "h1-8": {
+        "n": 3,
+        "median_mib_s": 11.215368481395235,
+        "min_mib_s": 11.196817191319434,
+        "max_mib_s": 11.239218745448285
+      },
+      "auto-8": {
+        "n": 3,
+        "median_mib_s": 11.037336242119212,
+        "min_mib_s": 8.759955606178455,
+        "max_mib_s": 11.1989081465031
+      }
+    },
+    "reverse_order": {
+      "h1-8": {
+        "n": 2,
+        "median_mib_s": 8.093543156420775,
+        "min_mib_s": 4.94956209914006,
+        "max_mib_s": 11.23752421370149
+      },
+      "baseline": {
+        "n": 2,
+        "median_mib_s": 4.170863477536473,
+        "min_mib_s": 3.217043320005472,
+        "max_mib_s": 5.124683635067473
+      }
+    }
+  },
+  "cohorts": {
+    "screening": {
+      "exe_sha256": "d9ff80ff931186e4cc89a8c21b8a3f146f02be22e860bbe26ecb152f0543a156",
+      "plan": [
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-3",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "h1-16",
+          "workers": 16,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-32",
+          "workers": 32,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "h1-64",
+          "workers": 64,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "auto-32",
+          "workers": 32,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-16-chunk1",
+          "workers": 16,
+          "chunk_mib": 1,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-16-chunk5",
+          "workers": 16,
+          "chunk_mib": 5,
+          "protocol": "h1"
+        },
+        {
+          "name": "h1-16-chunk20",
+          "workers": 16,
+          "chunk_mib": 20,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        }
+      ],
+      "seconds": 6.0,
+      "warmup": 1.0,
+      "rounds": [
+        {
+          "index": 1,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.000560999964364,
+          "received_bytes": 60983132,
+          "mib_per_second": 9.692101575628929,
+          "total_received_bytes": 64199784,
+          "whole_run_mib_per_second": 8.728474277443834,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 9,
+          "statuses": {
+            "206": 7
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.000348400033544749,
+          "valid_sample": true
+        },
+        {
+          "index": 2,
+          "name": "h1-3",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 6.000669800036121,
+          "received_bytes": 70418424,
+          "mib_per_second": 11.19145772196984,
+          "total_received_bytes": 78001111,
+          "whole_run_mib_per_second": 10.594560232132634,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 3,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 9,
+          "statuses": {
+            "206": 9
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00037869997322559357,
+          "valid_sample": true
+        },
+        {
+          "index": 3,
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.000768300029449,
+          "received_bytes": 70352888,
+          "mib_per_second": 11.18085868609128,
+          "total_received_bytes": 76891710,
+          "whole_run_mib_per_second": 10.43649938570313,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 8,
+          "active_at_window_start": 7,
+          "requests": 9,
+          "statuses": {
+            "206": 9
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00027359998784959316,
+          "valid_sample": true
+        },
+        {
+          "index": 4,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.000718750059605,
+          "received_bytes": 69238777,
+          "mib_per_second": 11.003889046395301,
+          "total_received_bytes": 77878569,
+          "whole_run_mib_per_second": 10.585285824587585,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 9,
+          "statuses": {
+            "206": 9
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0002542000147514045,
+          "valid_sample": true
+        },
+        {
+          "index": 5,
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 6.00040939997416,
+          "received_bytes": 70878211,
+          "mib_per_second": 11.265019587465822,
+          "total_received_bytes": 79651742,
+          "whole_run_mib_per_second": 10.797148711660494,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 8,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 12,
+          "statuses": {
+            "206": 11
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00029770005494356155,
+          "valid_sample": true
+        },
+        {
+          "index": 6,
+          "name": "h1-16",
+          "workers": 16,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 6.000419899995904,
+          "received_bytes": 70189047,
+          "mib_per_second": 11.155467872669517,
+          "total_received_bytes": 79281943,
+          "whole_run_mib_per_second": 10.763195681073235,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 16,
+          "peak_active_responses": 16,
+          "active_at_window_start": 16,
+          "requests": 17,
+          "statuses": {
+            "206": 17
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00020030001178383827,
+          "valid_sample": true
+        },
+        {
+          "index": 7,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.000878249993548,
+          "received_bytes": 68796375,
+          "mib_per_second": 10.933288956399602,
+          "total_received_bytes": 74798340,
+          "whole_run_mib_per_second": 10.148110737354248,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 9,
+          "statuses": {
+            "206": 9
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0005773999728262424,
+          "valid_sample": true
+        },
+        {
+          "index": 8,
+          "name": "h1-32",
+          "workers": 32,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 6.001009100058582,
+          "received_bytes": 70041600,
+          "mib_per_second": 11.13094046122142,
+          "total_received_bytes": 77594075,
+          "whole_run_mib_per_second": 10.547206098381766,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 32,
+          "peak_active_responses": 32,
+          "active_at_window_start": 32,
+          "requests": 32,
+          "statuses": {
+            "206": 32
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.001418100029695779,
+          "valid_sample": true
+        },
+        {
+          "index": 9,
+          "name": "h1-64",
+          "workers": 64,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 6.0008068000897765,
+          "received_bytes": 70679537,
+          "mib_per_second": 11.232699431579237,
+          "total_received_bytes": 77609764,
+          "whole_run_mib_per_second": 10.551639164833958,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 64,
+          "peak_active_responses": 64,
+          "active_at_window_start": 63,
+          "requests": 64,
+          "statuses": {
+            "206": 64
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00029850000282749534,
+          "valid_sample": true
+        },
+        {
+          "index": 10,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.000714250025339,
+          "received_bytes": 29918102,
+          "mib_per_second": 4.754788227568406,
+          "total_received_bytes": 33454278,
+          "whole_run_mib_per_second": 4.548249403991282,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 6,
+          "statuses": {
+            "206": 5
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0003443000023253262,
+          "valid_sample": true
+        },
+        {
+          "index": 11,
+          "name": "auto-32",
+          "workers": 32,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.000529650016688,
+          "received_bytes": 70238208,
+          "mib_per_second": 11.163077079339773,
+          "total_received_bytes": 77807643,
+          "whole_run_mib_per_second": 10.581429760201582,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 32,
+          "active_at_window_start": 32,
+          "requests": 32,
+          "statuses": {
+            "206": 32
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.000317899975925684,
+          "valid_sample": true
+        },
+        {
+          "index": 12,
+          "name": "h1-16-chunk1",
+          "workers": 16,
+          "chunk_mib": 1,
+          "protocol": "h1",
+          "external_seconds": 6.000465999997687,
+          "received_bytes": 70110236,
+          "mib_per_second": 11.142856469881945,
+          "total_received_bytes": 76042064,
+          "whole_run_mib_per_second": 10.328984299905217,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 16,
+          "peak_active_responses": 16,
+          "active_at_window_start": 15,
+          "requests": 83,
+          "statuses": {
+            "206": 79
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0002623000182211399,
+          "valid_sample": true
+        },
+        {
+          "index": 13,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.000426549988333,
+          "received_bytes": 64249849,
+          "mib_per_second": 10.211512517289112,
+          "total_received_bytes": 69924131,
+          "whole_run_mib_per_second": 9.495077080277921,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 9,
+          "statuses": {
+            "206": 9
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00033840001560747623,
+          "valid_sample": true
+        },
+        {
+          "index": 14,
+          "name": "h1-16-chunk5",
+          "workers": 16,
+          "chunk_mib": 5,
+          "protocol": "h1",
+          "external_seconds": 6.000543300062418,
+          "received_bytes": 70664179,
+          "mib_per_second": 11.230751822344635,
+          "total_received_bytes": 77446931,
+          "whole_run_mib_per_second": 10.496231471152528,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 16,
+          "peak_active_responses": 16,
+          "active_at_window_start": 16,
+          "requests": 22,
+          "statuses": {
+            "206": 22
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0003097999724559486,
+          "valid_sample": true
+        },
+        {
+          "index": 15,
+          "name": "h1-16-chunk20",
+          "workers": 16,
+          "chunk_mib": 20,
+          "protocol": "h1",
+          "external_seconds": 6.000555900041945,
+          "received_bytes": 70090752,
+          "mib_per_second": 11.139592916638398,
+          "total_received_bytes": 76414710,
+          "whole_run_mib_per_second": 10.394827048627661,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 16,
+          "peak_active_responses": 16,
+          "active_at_window_start": 16,
+          "requests": 16,
+          "statuses": {
+            "206": 16
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0002982000005431473,
+          "valid_sample": true
+        },
+        {
+          "index": 16,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.00077925005462,
+          "received_bytes": 67289120,
+          "mib_per_second": 10.693928712174177,
+          "total_received_bytes": 69801251,
+          "whole_run_mib_per_second": 9.48892189397845,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 9,
+          "statuses": {
+            "206": 9
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00028009997913613915,
+          "valid_sample": true
+        }
+      ],
+      "ready": {
+        "cdn_host": "dl-pc-zb.drive.quark.cn",
+        "engine_worker_limit": 64,
+        "event": "ready",
+        "file_size": 2607095503,
+        "traffic_cap_mib": 192
+      },
+      "median_mib_per_second": {
+        "baseline": 10.452720614731644,
+        "h1-3": 11.19145772196984,
+        "auto-8": 11.18085868609128,
+        "h1-8": 11.265019587465822,
+        "h1-16": 11.155467872669517,
+        "h1-32": 11.13094046122142,
+        "h1-64": 11.232699431579237,
+        "auto-32": 11.163077079339773,
+        "h1-16-chunk1": 11.142856469881945,
+        "h1-16-chunk5": 11.230751822344635,
+        "h1-16-chunk20": 11.139592916638398
+      },
+      "account_files_unchanged": true
+    },
+    "confirmation": {
+      "exe_sha256": "8acc1ee006352ca50c41df6cdd03da6ca4370a3dcd00ad8cf3e7f16f15684809",
+      "plan": [
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        }
+      ],
+      "seconds": 12.0,
+      "warmup": 2.0,
+      "rounds": [
+        {
+          "index": 1,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 12.000629950023722,
+          "received_bytes": 140591091,
+          "mib_per_second": 11.1725895357659,
+          "total_received_bytes": 158831907,
+          "whole_run_mib_per_second": 10.784377256848463,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 17,
+          "statuses": {
+            "206": 17
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0003331999760121107,
+          "valid_sample": true
+        },
+        {
+          "index": 2,
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 12.000387400039472,
+          "received_bytes": 141426666,
+          "mib_per_second": 11.239218745448285,
+          "total_received_bytes": 161161094,
+          "whole_run_mib_per_second": 10.958478105437225,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 8,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 18,
+          "statuses": {
+            "206": 18
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0002597999991849065,
+          "valid_sample": true
+        },
+        {
+          "index": 3,
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 12.000631299975794,
+          "received_bytes": 140922289,
+          "mib_per_second": 11.1989081465031,
+          "total_received_bytes": 160768737,
+          "whole_run_mib_per_second": 10.924548441272247,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 17,
+          "statuses": {
+            "206": 17
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0005032999906688929,
+          "valid_sample": true
+        },
+        {
+          "index": 4,
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 12.000465749995783,
+          "received_bytes": 138887221,
+          "mib_per_second": 11.037336242119212,
+          "total_received_bytes": 153076491,
+          "whole_run_mib_per_second": 10.401975806816957,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 16,
+          "statuses": {
+            "206": 16
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00036619999445974827,
+          "valid_sample": true
+        },
+        {
+          "index": 5,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 12.000760749913752,
+          "received_bytes": 136381328,
+          "mib_per_second": 10.837927066574618,
+          "total_received_bytes": 155842752,
+          "whole_run_mib_per_second": 10.5859238855325,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 17,
+          "statuses": {
+            "206": 16
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00027929997304454446,
+          "valid_sample": true
+        },
+        {
+          "index": 6,
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 12.000829950091429,
+          "received_bytes": 141131755,
+          "mib_per_second": 11.215368481395235,
+          "total_received_bytes": 160554880,
+          "whole_run_mib_per_second": 10.907963563736706,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 8,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 20,
+          "statuses": {
+            "206": 20
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0007424000068567693,
+          "valid_sample": true
+        },
+        {
+          "index": 7,
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 12.001176299992949,
+          "received_bytes": 140902376,
+          "mib_per_second": 11.196817191319434,
+          "total_received_bytes": 161439617,
+          "whole_run_mib_per_second": 10.963299320581914,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 8,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 18,
+          "statuses": {
+            "206": 18
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0007692000363022089,
+          "valid_sample": true
+        },
+        {
+          "index": 8,
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 12.002426599967293,
+          "received_bytes": 110248040,
+          "mib_per_second": 8.759955606178455,
+          "total_received_bytes": 129721099,
+          "whole_run_mib_per_second": 8.811017168214626,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 16,
+          "statuses": {
+            "206": 16
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0011476000072434545,
+          "valid_sample": true
+        },
+        {
+          "index": 9,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 12.000542750000022,
+          "received_bytes": 120709107,
+          "mib_per_second": 9.592664056984729,
+          "total_received_bytes": 124253475,
+          "whole_run_mib_per_second": 8.450866743623232,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 13,
+          "statuses": {
+            "206": 13
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0003296000068075955,
+          "valid_sample": true
+        }
+      ],
+      "ready": {
+        "cdn_host": "dl-pc-zb.drive.quark.cn",
+        "engine_worker_limit": 64,
+        "event": "ready",
+        "file_size": 2607095503,
+        "traffic_cap_mib": 192
+      },
+      "median_mib_per_second": {
+        "baseline": 10.837927066574618,
+        "h1-8": 11.215368481395235,
+        "auto-8": 11.037336242119212
+      },
+      "account_files_unchanged": true
+    },
+    "reverse_order": {
+      "exe_sha256": "8acc1ee006352ca50c41df6cdd03da6ca4370a3dcd00ad8cf3e7f16f15684809",
+      "plan": [
+        {
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        }
+      ],
+      "seconds": 12.0,
+      "warmup": 2.0,
+      "rounds": [
+        {
+          "index": 1,
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 12.008838099893183,
+          "received_bytes": 62325774,
+          "mib_per_second": 4.94956209914006,
+          "total_received_bytes": 69968807,
+          "whole_run_mib_per_second": 4.680296032793771,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 8,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 8,
+          "statuses": {
+            "206": 8
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0051451000035740435,
+          "valid_sample": true
+        },
+        {
+          "index": 2,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 12.00393529998837,
+          "received_bytes": 40493048,
+          "mib_per_second": 3.217043320005472,
+          "total_received_bytes": 49272104,
+          "whole_run_mib_per_second": 3.3455011447504557,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 6,
+          "statuses": {
+            "206": 6
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0007918000337667763,
+          "valid_sample": true
+        },
+        {
+          "index": 3,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 12.000739499984775,
+          "received_bytes": 64487417,
+          "mib_per_second": 5.124683635067473,
+          "total_received_bytes": 69145897,
+          "whole_run_mib_per_second": 4.702486550225473,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 9,
+          "statuses": {
+            "206": 9
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0004116999916732311,
+          "valid_sample": true
+        },
+        {
+          "index": 4,
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 12.000806449970696,
+          "received_bytes": 141410281,
+          "mib_per_second": 11.23752421370149,
+          "total_received_bytes": 161177474,
+          "whole_run_mib_per_second": 10.929415442130894,
+          "protocol_observed": "HTTP/1.1",
+          "connections": 8,
+          "peak_active_responses": 8,
+          "active_at_window_start": 8,
+          "requests": 19,
+          "statuses": {
+            "206": 19
+          },
+          "repeated_ranges": 0,
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.0005371999577619135,
+          "valid_sample": true
+        }
+      ],
+      "ready": {
+        "cdn_host": "dl-pc-zb.drive.quark.cn",
+        "engine_worker_limit": 64,
+        "event": "ready",
+        "file_size": 2607095503,
+        "traffic_cap_mib": 192
+      },
+      "median_mib_per_second": {
+        "h1-8": 8.093543156420775,
+        "baseline": 4.170863477536473
+      },
+      "account_files_unchanged": true
+    }
+  },
+  "excluded_diagnostic": {
+    "reason": "HTTP/1.1 probe retained HTTP/2 ALPN after cloning initialized transport. Fixed and regression-tested. Neither this failed H1 sample nor its adjacent baseline is included in the 29-window comparison.",
+    "raw": {
+      "exe_sha256": "5c071837f12aa1f508e2f870aa51c1219b9966e4c0172f7864639195fbcc42f2",
+      "plan": [
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-3",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "auto-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-8",
+          "workers": 8,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "h1-16",
+          "workers": 16,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-32",
+          "workers": 32,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "h1-64",
+          "workers": 64,
+          "chunk_mib": 10,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "auto-32",
+          "workers": 32,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-16-chunk1",
+          "workers": 16,
+          "chunk_mib": 1,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        },
+        {
+          "name": "h1-16-chunk5",
+          "workers": 16,
+          "chunk_mib": 5,
+          "protocol": "h1"
+        },
+        {
+          "name": "h1-16-chunk20",
+          "workers": 16,
+          "chunk_mib": 20,
+          "protocol": "h1"
+        },
+        {
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto"
+        }
+      ],
+      "seconds": 6.0,
+      "warmup": 1.0,
+      "rounds": [
+        {
+          "index": 1,
+          "name": "baseline",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "auto",
+          "external_seconds": 6.000991599983536,
+          "received_bytes": 69075858,
+          "mib_per_second": 10.977497728626371,
+          "total_received_bytes": 78846160,
+          "whole_run_mib_per_second": 10.701918296016412,
+          "protocol_observed": "HTTP/2.0",
+          "connections": 1,
+          "peak_active_responses": 3,
+          "active_at_window_start": 3,
+          "requests": 9,
+          "statuses": {
+            "206": 8
+          },
+          "error": "",
+          "ended_early": false,
+          "ipc_max_seconds": 0.00042349996510893106,
+          "valid_sample": true
+        },
+        {
+          "index": 2,
+          "name": "h1-3",
+          "workers": 3,
+          "chunk_mib": 10,
+          "protocol": "h1",
+          "external_seconds": 6.000686799990945,
+          "received_bytes": 0,
+          "mib_per_second": 0.0,
+          "total_received_bytes": 0,
+          "whole_run_mib_per_second": 0.0,
+          "protocol_observed": "",
+          "connections": 3,
+          "peak_active_responses": 0,
+          "active_at_window_start": 0,
+          "requests": 3,
+          "statuses": {},
+          "error": "download failed (*download.retryableTransferError)",
+          "ended_early": true,
+          "ipc_max_seconds": 0.0003155000158585608,
+          "valid_sample": false
+        }
+      ],
+      "ready": {
+        "cdn_host": "dl-pc-zb.drive.quark.cn",
+        "engine_worker_limit": 64,
+        "event": "ready",
+        "file_size": 2607095503,
+        "traffic_cap_mib": 192
+      },
+      "account_files_unchanged": true
+    }
+  },
+  "source_manifest": {
+    "original_sha256": "9863cd4ac3a85b784bca16d59477f3744bf14252d055e084f9d384818a8ef11a",
+    "overlay_sha256": "53edd82ca961f110d08d8b4ac96252259b6890c4855112f25db75fc89f6ef913",
+    "only_change": "worker cap 8 -> 64; experimental executable only",
+    "probe_sources": {
+      "cmd\\panzhan-speedprobe\\main_windows.go": "f81c8cd55e50e011e2627be962abd8063a198224c2b5dd20047bde44d0ff61aa",
+      "cmd\\panzhan-speedprobe\\matrix_windows.go": "20df4b6534d56ddece3bc95a5bcdb8b17eacc72b03b28698cdde1f7662809b29",
+      "cmd\\panzhan-speedprobe\\matrix_windows_test.go": "7726c78c1763bed7d52e10491943c234c2b1ae27564a7ffd44966397d577337e"
+    },
+    "confirmation_probe_sources": {
+      "cmd\\panzhan-speedprobe\\main_windows.go": "f81c8cd55e50e011e2627be962abd8063a198224c2b5dd20047bde44d0ff61aa",
+      "cmd\\panzhan-speedprobe\\matrix_windows.go": "939e03c8cd1f78275f157e3bc9bf9ad34a83e1ca35ad9814186df62d35c9d10b",
+      "cmd\\panzhan-speedprobe\\matrix_windows_test.go": "7726c78c1763bed7d52e10491943c234c2b1ae27564a7ffd44966397d577337e"
+    },
+    "controller_sha256": "9639a91b4cfedc6346c1065baf2cee383bfb1424ec6da5ee7cc57026757daacc"
+  },
+  "final_checks": {
+    "production_downloader_unchanged": true,
+    "probe_matches_confirmation_manifest": true,
+    "controller_matches_manifest": true,
+    "no_case_directories_remaining": true,
+    "no_probe_processes_remaining": true
+  },
+  "validation": {
+    "go_test": "go test ./internal/download ./internal/quark ./cmd/panzhan-speedprobe -count=1: passed",
+    "go_vet": "go vet ./cmd/panzhan-speedprobe: passed",
+    "python_compile": "python -m py_compile scripts/test_download_matrix.py: passed"
+  },
+  "interpretation": "H1 with 8 workers is a candidate, not a proven sustained improvement. Initial balanced long-window medians differ by about 3.5 percent; reverse-order checks show major slowdowns in both modes. 100 Mbps local ceiling limits inference. No benefit observed from 32/64 workers or changed chunk sizes in single screening windows.",
+  "not_tested": [
+    "external aria2 or Gopeed executable",
+    "NAS deployment",
+    "256 connections",
+    "full-file completion and hash",
+    "controlled gigabit environment"
+  ]
+}

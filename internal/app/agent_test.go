@@ -12,6 +12,7 @@ import (
 	"panzhan/internal/quark"
 	"panzhan/internal/search"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -41,11 +42,177 @@ func agentRequest(a *App, method, path, token string, payload any, admin bool) *
 }
 func grantForTest(t *testing.T, a *App, name string, scopes []string) (AgentGrant, string) {
 	t.Helper()
-	g, token, err := a.createAgent(name, "", scopes, 30)
+	g, token, err := a.createAgent(name, scopes, 30)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return g, token
+}
+
+func TestAgentCategoryDirectoryValidation(t *testing.T) {
+	root := t.TempDir()
+	base := filepath.Join(root, "Library", "Default")
+	movie := filepath.Join(base, "Movies")
+	if err := os.MkdirAll(movie, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "Outside"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	valid, err := validateAgentCategoryDirs(root, "Library/Default", map[string]string{"movie": "Library/Default/Movies"})
+	if err != nil {
+		t.Fatalf("valid nested mapping rejected: %v", err)
+	}
+	if valid["movie"] != "Library/Default/Movies" {
+		t.Fatalf("mapping was not normalized: %#v", valid)
+	}
+	cases := []struct {
+		name string
+		base string
+		mapv map[string]string
+	}{
+		{"unknown category", "Library", map[string]string{"arbitrary": "Library/Movies"}},
+		{"other cannot be mapped", "Library", map[string]string{"other": "Library/Movies"}},
+		{"absolute path", "Library", map[string]string{"movie": movie}},
+		{"traversal", "Library", map[string]string{"movie": "Library/../Outside"}},
+		{"base itself", "Library/Default", map[string]string{"movie": "Library/Default"}},
+		{"missing directory", "Library/Default", map[string]string{"movie": "Library/Default/Missing"}},
+		{"outside default directory", "Library/Default", map[string]string{"movie": "Library/Movies"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := validateAgentCategoryDirs(root, tc.base, tc.mapv); err == nil {
+				t.Fatal("invalid mapping accepted")
+			}
+		})
+	}
+	link := filepath.Join(base, "LinkedOutside")
+	if err := os.Symlink(filepath.Join(root, "Outside"), link); err != nil {
+		t.Skipf("symbolic link creation unavailable: %v", err)
+	}
+	if _, err := validateAgentCategoryDirs(root, "Library/Default", map[string]string{"movie": "Library/Default/LinkedOutside"}); err == nil {
+		t.Fatal("category symlink escaping the default directory was accepted")
+	}
+}
+
+func TestAgentCategoryGrantSnapshot(t *testing.T) {
+	a, _, root, _ := agentFixture(t)
+	base := filepath.Join(root, "Library")
+	defaultDir := filepath.Join(base, "Default")
+	movieDir := filepath.Join(defaultDir, "Movies")
+	if err := os.MkdirAll(movieDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.change(func(st *State) error {
+		st.Settings.DownloadRoot = root
+		st.Settings.DefaultDir = "Library/Default"
+		st.Settings.AgentCategoryDirs = map[string]string{"movie": "Library/Default/Movies"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	grant, _, err := a.createAgent("snapshot", []string{"resources:read", "downloads:create"}, 30)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if grant.Root != root || grant.Directory != "Library/Default" || grant.CategoryDirs["movie"] != "Library/Default/Movies" || !grant.CategoryRouting {
+		t.Fatalf("unexpected grant snapshot: %+v", grant)
+	}
+	a.change(func(st *State) error { st.Settings.AgentCategoryDirs["movie"] = "elsewhere"; return nil })
+	if grant.CategoryDirs["movie"] != "Library/Default/Movies" {
+		t.Fatal("grant category snapshot changed with settings")
+	}
+}
+
+func TestAgentCategorySettingsRejectOutsideDefault(t *testing.T) {
+	a, _, root, _ := agentFixture(t)
+	base := filepath.Join(root, "Default")
+	if err := os.MkdirAll(filepath.Join(base, "Movies"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(root, "Outside"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	settings := a.snapshot().Settings
+	settings.DownloadRoot = root
+	settings.DefaultDir = "Default"
+	settings.AgentCategoryDirs = map[string]string{"movie": "Default/Movies"}
+	if response := agentRequest(a, "POST", "/api/settings", "", settings, true); response.Code != 200 {
+		t.Fatalf("valid category settings rejected: %d %s", response.Code, response.Body.String())
+	}
+	settings.AgentCategoryDirs = map[string]string{"movie": "Outside"}
+	if response := agentRequest(a, "POST", "/api/settings", "", settings, true); response.Code != 400 {
+		t.Fatalf("category outside default directory accepted: %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestAgentCategoryToolContractAndDestination(t *testing.T) {
+	a, _, root, _ := agentFixture(t)
+	base := filepath.Join(root, "Default")
+	movie := filepath.Join(base, "Movies")
+	if err := os.MkdirAll(movie, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := a.change(func(st *State) error {
+		st.Settings.DownloadRoot = root
+		st.Settings.DefaultDir = "Default"
+		st.Settings.AgentCategoryDirs = map[string]string{"movie": "Default/Movies"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	g, _ := grantForTest(t, a, "categorized", agentScopes)
+	var downloadSchema map[string]any
+	for _, spec := range agentToolSpecs(g) {
+		if spec.Name == "panzhan_download" {
+			downloadSchema = spec.Schema
+		}
+	}
+	properties := downloadSchema["properties"].(map[string]any)
+	category := properties["category_id"].(map[string]any)
+	if !slices.Equal(category["enum"].([]string), []string{"movie", "other"}) {
+		t.Fatalf("unexpected authorized category enum: %#v", category)
+	}
+	if !slices.Contains(downloadSchema["required"].([]string), "category_id") {
+		t.Fatal("category is not required for categorized grant")
+	}
+	emptyMapped := g
+	emptyMapped.CategoryDirs = map[string]string{}
+	for _, spec := range agentToolSpecs(emptyMapped) {
+		if spec.Name == "panzhan_download" {
+			props := spec.Schema["properties"].(map[string]any)
+			if !slices.Equal(props["category_id"].(map[string]any)["enum"].([]string), []string{"other"}) {
+				t.Fatal("new grant without mappings must still allow the fallback category")
+			}
+		}
+	}
+	if destination, _, err := agentCategoryDestination(emptyMapped, "other"); err != nil || destination != g.Directory {
+		t.Fatalf("new empty-category grant cannot use fallback: %q %v", destination, err)
+	}
+	if destination, _, err := agentCategoryDestination(g, "arbitrary/path"); err == nil || destination != "" {
+		t.Fatal("unconfigured path-like category was accepted")
+	}
+	destination, name, err := agentCategoryDestination(g, "movie")
+	if err != nil || destination != "Default/Movies" || name != "电影" {
+		t.Fatalf("category did not resolve to authorized destination: %q %q %v", destination, name, err)
+	}
+	if _, name, err = agentCategoryDestination(g, "other"); err != nil || name != "其他" {
+		t.Fatalf("fallback category resolution failed: %q %v", name, err)
+	}
+	legacy := AgentGrant{Directory: "Default/Legacy", Scopes: agentScopes}
+	for _, spec := range agentToolSpecs(legacy) {
+		if spec.Name == "panzhan_download" {
+			if _, ok := spec.Schema["properties"].(map[string]any)["category_id"]; ok {
+				t.Fatal("legacy tool schema unexpectedly requires a category")
+			}
+		}
+	}
+	if destination, _, err = agentCategoryDestination(legacy, ""); err != nil || destination != legacy.Directory {
+		t.Fatalf("legacy directory behavior changed: %q %v", destination, err)
+	}
+	if _, _, err = agentCategoryDestination(legacy, "movie"); err == nil {
+		t.Fatal("legacy authorization accepted a category")
+	}
 }
 func agentFixture(t *testing.T) (*App, string, string, *atomic.Int64) {
 	t.Helper()
@@ -154,9 +321,15 @@ func TestAgentEndToEndConfirmationDownloadEventAndRestart(t *testing.T) {
 		t.Fatal(preview.Code, preview.Body.String())
 	}
 	var choice struct {
-		ID string `json:"choice_id"`
+		ID         string `json:"choice_id"`
+		Categories []struct {
+			ID string `json:"id"`
+		} `json:"categories"`
 	}
 	json.Unmarshal(preview.Body.Bytes(), &choice)
+	if len(choice.Categories) != 1 || choice.Categories[0].ID != categoryOther {
+		t.Fatalf("preview did not advertise the fallback category: %s", preview.Body.String())
+	}
 	for _, secret := range []string{"private-share-token", "private-file-token", "private-account-cookie"} {
 		if strings.Contains(preview.Body.String(), secret) {
 			t.Error("preview leaked credential")
@@ -176,7 +349,7 @@ func TestAgentEndToEndConfirmationDownloadEventAndRestart(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			responses <- agentRequest(a, "POST", "/api/agent/v1/downloads", token, map[string]any{"choice_id": choice.ID, "request_id": "user-message-1", "user_confirmed": true}, false)
+			responses <- agentRequest(a, "POST", "/api/agent/v1/downloads", token, map[string]any{"choice_id": choice.ID, "request_id": "user-message-1", "user_confirmed": true, "category_id": "other"}, false)
 		}()
 	}
 	wg.Wait()
@@ -195,7 +368,7 @@ func TestAgentEndToEndConfirmationDownloadEventAndRestart(t *testing.T) {
 	if response := agentRequest(a, "GET", "/api/agent/v1/tasks?task_id="+jobID, otherToken, nil, false); response.Code != 400 {
 		t.Fatal("other grant can read task")
 	}
-	if response := agentRequest(a, "POST", "/api/agent/v1/downloads", otherToken, map[string]any{"choice_id": choice.ID, "request_id": "other-message", "user_confirmed": true}, false); response.Code != 400 {
+	if response := agentRequest(a, "POST", "/api/agent/v1/downloads", otherToken, map[string]any{"choice_id": choice.ID, "request_id": "other-message", "user_confirmed": true, "category_id": "other"}, false); response.Code != 400 {
 		t.Fatal("other grant can consume choice", other.ID)
 	}
 	ctx, cancel := context.WithCancel(context.Background())

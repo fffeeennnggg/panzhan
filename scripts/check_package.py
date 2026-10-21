@@ -21,6 +21,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class BuildTests(unittest.TestCase):
 
+    def test_agent_bundle_contains_combined_panzhan_skill(self):
+        with zipfile.ZipFile(ROOT / "internal/web/assets/agent-kit.zip") as bundle:
+            for name in ["integrations/agents/panzhan/SKILL.md", "integrations/agents/panzhan/README.md"]:
+                self.assertIn(name, bundle.namelist())
+                self.assertEqual(bundle.read(name), (ROOT / name).read_bytes().replace(b'\r\n', b'\n'))
+
+    def test_panzhan_skill_uses_preview_categories_without_inventing_paths(self):
+        skill = (ROOT / "integrations/agents/panzhan/SKILL.md").read_text(encoding="utf8")
+        for phrase in ["categories returned by this preview", "category_id", "use `other`", "Never derive a destination path", "user_confirmed: true", "reuse the same `request_id`"]:
+            self.assertIn(phrase, skill)
+
     def test_agent_bundle_matches_current_public_sources(self):
         location = ROOT / "scripts/build_agent_kit.py"
         spec = importlib.util.spec_from_file_location("agent_kit_builder", location)

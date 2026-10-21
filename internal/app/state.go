@@ -24,13 +24,14 @@ import (
 )
 
 type Settings struct {
-	DefaultDir                string   `json:"default_dir"`
-	DownloadRoot              string   `json:"download_root,omitempty"`
-	Concurrency               int      `json:"concurrency"`
-	ChunkMiB                  int      `json:"chunk_mib"`
-	SearchPriorityConcurrency int      `json:"search_priority_concurrency"`
-	SearchChannelConcurrency  int      `json:"search_channel_concurrency"`
-	Sources                   []string `json:"sources"`
+	DefaultDir                string            `json:"default_dir"`
+	DownloadRoot              string            `json:"download_root,omitempty"`
+	AgentCategoryDirs         map[string]string `json:"agent_category_dirs,omitempty"`
+	Concurrency               int               `json:"concurrency"`
+	ChunkMiB                  int               `json:"chunk_mib"`
+	SearchPriorityConcurrency int               `json:"search_priority_concurrency"`
+	SearchChannelConcurrency  int               `json:"search_channel_concurrency"`
+	Sources                   []string          `json:"sources"`
 }
 type SavedFile struct {
 	ID         string `json:"id"`
@@ -58,6 +59,8 @@ type Job struct {
 	DownloadRoot string        `json:"download_root,omitempty"`
 	Status       string        `json:"status"`
 	Error        string        `json:"error,omitempty"`
+	RetryCount   int           `json:"retry_count,omitempty"`
+	NextRetryAt  string        `json:"next_retry_at,omitempty"`
 	Created      string        `json:"created"`
 	CloudDir     string        `json:"cloud_dir"`
 	Original     []quark.File  `json:"original"`
@@ -240,6 +243,11 @@ func New(dataDir, rootPath string) (*App, error) {
 	}
 	for i := range a.state.Jobs {
 		j := &a.state.Jobs[i]
+		if legacyRetryableJob(*j) {
+			j.Status = "retrying"
+			j.RetryCount++
+			j.NextRetryAt = time.Now().Add(taskRetryDelay(j.RetryCount)).Format(time.RFC3339)
+		}
 		if j.Status == "transferring" || j.Status == "downloading" || j.Status == "verifying" {
 			j.Status = "queued"
 		}

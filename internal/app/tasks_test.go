@@ -56,6 +56,80 @@ func TestWorkerReportsFailureInsteadOfLeavingQueued(t *testing.T) {
 	t.Fatal("worker did not persist error")
 }
 
+func TestTransientTaskFailureIsScheduledForAutomaticRetry(t *testing.T) {
+	a, err := New(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = a.change(func(s *State) error {
+		s.Jobs = append(s.Jobs, Job{ID: "retry", Status: "queued"})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !a.recordRunFailure("retry", &quark.TemporaryError{Err: fmt.Errorf("temporary network failure")}) {
+		t.Fatal("transient task failure was not scheduled")
+	}
+	j, err := a.job("retry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j.Status != "retrying" || j.RetryCount != 1 || j.NextRetryAt == "" || j.Error == "" {
+		t.Fatalf("retry state not persisted: %+v", j)
+	}
+}
+
+func TestUncertainTransferIsNotAutomaticallyRetried(t *testing.T) {
+	a, err := New(t.TempDir(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = a.change(func(s *State) error {
+		s.Jobs = append(s.Jobs, Job{ID: "uncertain", Status: "queued", Uncertain: true})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if a.recordRunFailure("uncertain", &quark.TemporaryError{Err: fmt.Errorf("temporary network failure")}) {
+		t.Fatal("uncertain transfer must not be retried automatically")
+	}
+	j, err := a.job("uncertain")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j.Status != "attention" || j.RetryCount != 0 || j.NextRetryAt != "" {
+		t.Fatalf("uncertain task state changed unexpectedly: %+v", j)
+	}
+}
+
+func TestAutomaticRetrySurvivesRestartScheduleUntilDue(t *testing.T) {
+	dataDir, root := t.TempDir(), t.TempDir()
+	a, err := New(dataDir, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	due := time.Now().Add(-time.Second).Format(time.RFC3339)
+	if err = a.change(func(s *State) error {
+		s.Jobs = append(s.Jobs, Job{ID: "retry-after-restart", Status: "retrying", RetryCount: 2, NextRetryAt: due})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// Loading persisted state must preserve retry scheduling until the deadline.
+	a, err = New(dataDir, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.queueDueRetries(time.Now())
+	j, err := a.job("retry-after-restart")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j.Status != "queued" || j.NextRetryAt != "" || j.RetryCount != 2 {
+		t.Fatalf("due retry was not requeued: %+v", j)
+	}
+}
+
 func TestTaskPipelineSavesRealFileAndReusesTransferredIDs(t *testing.T) {
 	payload := "real file on NAS"
 	saved := 0

@@ -61,7 +61,7 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 	ok := func(v any) { writeJSON(w, 200, v) }
 	path := r.URL.Path
 	if path == "/api/status" && r.Method == "GET" {
-		ok(map[string]any{"configured": a.isConfigured(), "authenticated": a.authenticated(r), "version": "0.2.0", "request_token": a.requestToken})
+		ok(map[string]any{"configured": a.isConfigured(), "authenticated": a.authenticated(r), "version": "0.2.2", "request_token": a.requestToken})
 		return
 	}
 	if (path == "/api/setup" || path == "/api/login") && r.Method == "POST" {
@@ -133,7 +133,7 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 		if settings.DownloadRoot == "" {
 			settings.DownloadRoot = a.rootPath
 		}
-		ok(map[string]any{"settings": settings, "root": a.rootPath, "version": "0.2.0"})
+		ok(map[string]any{"settings": settings, "root": a.rootPath, "version": "0.2.2"})
 	case path == "/api/settings" && r.Method == "POST":
 		var in Settings
 		if err := body(r, &in); err != nil {
@@ -165,6 +165,11 @@ func (a *App) api(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		d.Close()
+		in.AgentCategoryDirs, err = validateAgentCategoryDirs(downloadRoot, in.DefaultDir, in.AgentCategoryDirs)
+		if err != nil {
+			fail(err)
+			return
+		}
 		knownSources := map[string]bool{}
 		for _, source := range a.search.Sources() {
 			knownSources[source.ID] = true

@@ -8,10 +8,12 @@
 
 首版面向 Hermes 与盘栈同机部署。Hermes 可原生运行或运行在 NAS 的 Docker 容器中；独立的远程终端沙箱不在首版支持范围内。
 
+交付物是一个可安装的 Hermes Skill 包，位于 `integrations/agents/panzhan/`，包含 `SKILL.md` 和安装说明。一个 Skill 同时负责首次接入和后续盘栈操作，不拆成配置 Skill 与使用 Skill。
+
 ## 用户流程
 
 1. 用户在盘栈「设置 → Agent 授权」创建授权，限定下载目录、有效期和能力，并复制一次性显示的令牌。
-2. 用户在 Hermes 微信会话中要求“连接盘栈”，并发送令牌。令牌属于聊天内容，可能保留在微信会话、Hermes 会话历史或运行日志中；用户接受通过微信输入。Skill 不得主动在回复、后续提示或诊断输出中复述令牌，也不得把它拼进可见命令行或提交到仓库。
+2. 用户按包内安装说明把 Skill 安装到目标 Hermes profile。之后在 Hermes 微信会话中要求“连接盘栈”，并发送令牌。令牌属于聊天内容，可能保留在微信会话、Hermes 会话历史或运行日志中；用户接受通过微信输入。Skill 不得主动在回复、后续提示或诊断输出中复述令牌，也不得提交到仓库。
 3. Skill 确认运行环境能访问当前 Hermes profile 的配置和命令。若无法确认配置归属，停止并说明需要从 NAS 上正确的 Hermes 实例执行。
 4. Skill 确认盘栈 MCP 地址。若 Hermes 与盘栈共享主机网络命名空间，可使用 `http://127.0.0.1:9867/mcp`；Hermes 在独立容器时，使用该容器可达的 NAS 宿主机地址。地址不可达时向用户询问可访问的 NAS 地址，不扫描局域网。
 5. Skill 将令牌保存为 Hermes profile 的 `PANZHAN_AGENT_TOKEN` 环境变量；MCP 配置中的 Authorization 只引用 `${PANZHAN_AGENT_TOKEN}`，不写入令牌字面值。
@@ -23,14 +25,13 @@
 
 MCP 服务配置使用当前仓库的 Hermes 示例作为基础：URL 为 `/mcp`，请求头为 `Authorization: Bearer ${PANZHAN_AGENT_TOKEN}`，传输为 Streamable HTTP，工具超时为 120 秒。环境变量值由 Hermes 的配置机制保存到活动 profile 的 `.env`；Skill 不将令牌放到 `config.yaml`、技能文件或仓库。
 
-配置更新必须是结构化合并，不能重写整个 `config.yaml`。执行前保存可恢复备份；失败时保留原配置并报告错误。写入令牌时避免把令牌放入命令参数、shell 历史或可见诊断输出。由于令牌由聊天消息提供，Skill 无法保证 Hermes、微信平台或模型工具调用记录不保存原始消息或令牌；因此建议为接入创建短有效期授权，连接测试完成后若不再需要则在盘栈撤销。令牌授权仍由盘栈控制，Skill 不请求管理 Cookie、管理密码或其他盘栈凭据。
+配置更新使用 Hermes 官方 `hermes config set` 命令：令牌变量写入活动 profile 的 `.env`，MCP 项目用结构化配置键合并，不覆盖其他服务器。执行前保存可恢复备份；失败时保留原配置并报告错误。该命令把令牌作为命令参数，Hermes 会遮蔽凭据形状的输出，但终端/工具调用记录仍可能留存命令参数。Skill 不在回复或诊断中复述令牌，也不承诺上游日志不留存。建议使用短有效期授权，连接测试完成后若不再需要则在盘栈撤销。令牌授权仍由盘栈控制，Skill 不请求管理 Cookie、管理密码或其他盘栈凭据。
 
 ## 部署与运行边界
 
 - Hermes 原生部署在 NAS 时，MCP 地址通常为 loopback 地址。
-- Hermes 与盘栈处于不同 Docker 网络命名空间时，容器内的 `127.0.0.1` 不指向 NAS 宿主机。Skill 必须要求一个从 Hermes 容器可达的 NAS 地址，并通过 MCP 测试验证。
+- Hermes 与盘栈处于不同 Docker 网络命名空间时，容器内的 `127.0.0.1` 不指向 NAS 宿主机。Skill 必须要求一个从 Hermes 容器可达的 NAS 地址，并验证盘栈监听地址、容器端口映射和 NAS 防火墙后执行 MCP 测试。
 - Hermes 网关消息会话可以接收用户显式发送的令牌。此路径不使用 Hermes 本机 CLI 的安全输入提示；令牌会出现在微信历史中，且其他副本是否保留取决于 Hermes、微信平台及其日志配置。Skill 不回显令牌，保存后只报告已保存。
-- 首次启用 Skill 的分发/安装流程不属于本设计；首版假定该 Skill 已存在于 Hermes 的技能目录中。
 - 下载完成通知转发、OpenClaw 配置、局域网地址自动发现、远程 SSH 终端沙箱、自动新建或撤销盘栈授权均不在首版范围内。
 
 ## 失败处理
@@ -51,4 +52,4 @@ MCP 服务配置使用当前仓库的 Hermes 示例作为基础：URL 为 `/mcp`
 
 ## 依据
 
-Hermes 支持 MCP HTTP 服务、环境变量引用和 MCP 连接测试；修改 MCP 配置后可用 `/reload-mcp` 刷新。盘栈当前提供 `/mcp`、Agent 独立令牌、OpenClaw/Hermes 配置样例及操作说明。本机没有 Hermes 运行时，因此本设计尚未完成 Hermes 端到端验证。
+Hermes 支持 Skills Hub/GitHub 安装、MCP HTTP 服务、`hermes config set` 环境变量保存和配置合并、MCP 连接测试；修改 MCP 配置后可用 `/reload-mcp` 刷新。盘栈当前提供 `/mcp`、Agent 独立令牌、OpenClaw/Hermes 配置样例及操作说明。本机没有 Hermes 运行时，因此本设计尚未完成 Hermes 端到端验证。官方资料：[Skills System](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills/)、[MCP](https://hermes-agent.nousresearch.com/docs/user-guide/features/mcp/)、[CLI Commands Reference](https://hermes-agent.nousresearch.com/docs/reference/cli-commands/)。

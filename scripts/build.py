@@ -26,7 +26,9 @@ def stage_package(binary: Path, destination: Path):
     target.chmod(0o755)
     shutil.copyfile(ROOT / "LICENSE", destination / "app/LICENSE")
     shutil.copyfile(ROOT / "THIRD_PARTY_NOTICES.md", destination / "app/THIRD_PARTY_NOTICES.md")
-    shutil.copytree(ROOT / "licenses", destination / "app/licenses")
+    # Do not preserve source read-only attributes; Windows must be able to
+    # replace a previous staging tree on the next build.
+    shutil.copytree(ROOT / "licenses", destination / "app/licenses", copy_function=shutil.copyfile)
     for script in (destination / "cmd").iterdir():
         # Windows checkouts may use CRLF, which breaks Linux shebangs.
         script.write_bytes(script.read_bytes().replace(b"\r\n", b"\n"))

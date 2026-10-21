@@ -6,23 +6,118 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 )
 
 var agentScopes = []string{"resources:read", "downloads:create", "tasks:read", "events:read"}
 
+const (
+	categoryMovie    = "movie"
+	categorySeries   = "series"
+	categoryAnime    = "anime"
+	categoryMusic    = "music"
+	categoryLearning = "learning"
+	categorySoftware = "software"
+	categoryOther    = "other"
+)
+
+var agentCategoryNames = map[string]string{
+	categoryMovie: "电影", categorySeries: "电视剧", categoryAnime: "动漫",
+	categoryMusic: "音乐", categoryLearning: "学习资料", categorySoftware: "软件", categoryOther: "其他",
+}
+
+func validateAgentCategoryDirs(root, base string, configured map[string]string) (map[string]string, error) {
+	result := make(map[string]string, len(configured))
+	base = filepath.ToSlash(filepath.Clean(filepath.FromSlash(base)))
+	if base == "." {
+		base = ""
+	}
+	for id, raw := range configured {
+		if _, ok := agentCategoryNames[id]; !ok || id == categoryOther {
+			return nil, errors.New("分类无效")
+		}
+		if raw == "" || filepath.IsAbs(filepath.FromSlash(raw)) || filepath.VolumeName(filepath.FromSlash(raw)) != "" {
+			return nil, errors.New("分类目录必须是默认目录下的相对路径")
+		}
+		dir := filepath.ToSlash(filepath.Clean(filepath.FromSlash(raw)))
+		if dir == "." || dir == ".." || strings.HasPrefix(dir, "../") {
+			return nil, errors.New("分类目录必须位于默认目录下")
+		}
+		basePath := filepath.FromSlash(base)
+		if basePath == "" {
+			basePath = "."
+		}
+		rel, err := filepath.Rel(basePath, filepath.FromSlash(dir))
+		if err != nil || rel == "." || rel == ".." || filepath.IsAbs(rel) || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return nil, errors.New("分类目录必须是默认目录内的已有子目录")
+		}
+		rootAbs, err := filepath.Abs(root)
+		if err != nil {
+			return nil, errors.New("分类目录无法解析")
+		}
+		baseReal, err := filepath.EvalSymlinks(filepath.Join(rootAbs, filepath.FromSlash(base)))
+		if err != nil {
+			return nil, errors.New("默认目录不存在或无法访问")
+		}
+		dirReal, err := filepath.EvalSymlinks(filepath.Join(rootAbs, filepath.FromSlash(dir)))
+		if err != nil {
+			return nil, errors.New("分类目录不存在或无法访问")
+		}
+		realRel, err := filepath.Rel(baseReal, dirReal)
+		if err != nil || realRel == "." || realRel == ".." || filepath.IsAbs(realRel) || strings.HasPrefix(realRel, ".."+string(filepath.Separator)) {
+			return nil, errors.New("分类目录不能通过符号链接指向默认目录以外")
+		}
+		r, err := (&App{}).directoryAt(root, dir)
+		if err != nil {
+			return nil, errors.New("分类目录不存在或无法访问")
+		}
+		r.Close()
+		result[id] = dir
+	}
+	return result, nil
+}
+
+func sortedAgentCategoryIDs(dirs map[string]string) []string {
+	ids := make([]string, 0, len(dirs))
+	for id := range dirs {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func agentCategoryDestination(g AgentGrant, id string) (string, string, error) {
+	if !g.CategoryRouting {
+		if id != "" {
+			return "", "", errors.New("旧授权不支持类别，请重新创建授权后使用分类下载")
+		}
+		return g.Directory, agentCategoryNames[categoryOther], nil
+	}
+	if id == categoryOther {
+		return g.Directory, agentCategoryNames[categoryOther], nil
+	}
+	if destination, ok := g.CategoryDirs[id]; ok {
+		return destination, agentCategoryNames[id], nil
+	}
+	return "", "", errors.New("类别无效或未配置，请重新预览可用类别")
+}
+
 type AgentGrant struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	TokenHash string    `json:"token_hash"`
-	Scopes    []string  `json:"scopes"`
-	Root      string    `json:"root"`
-	Directory string    `json:"directory"`
-	Created   time.Time `json:"created_at"`
-	Expires   time.Time `json:"expires_at"`
-	Revoked   bool      `json:"revoked"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	TokenHash       string            `json:"token_hash"`
+	Scopes          []string          `json:"scopes"`
+	Root            string            `json:"root"`
+	Directory       string            `json:"directory"`
+	CategoryDirs    map[string]string `json:"category_dirs,omitempty"`
+	CategoryRouting bool              `json:"category_routing,omitempty"`
+	Created         time.Time         `json:"created_at"`
+	Expires         time.Time         `json:"expires_at"`
+	Revoked         bool              `json:"revoked"`
 }
 type AgentChoice struct {
 	ID      string    `json:"id"`
@@ -65,9 +160,9 @@ func (a *App) agentAuth(r *http.Request) (AgentGrant, bool) {
 	return empty, false
 }
 func (g AgentGrant) public() map[string]any {
-	return map[string]any{"id": g.ID, "name": g.Name, "scopes": g.Scopes, "download_root": g.Root, "directory": g.Directory, "created_at": g.Created, "expires_at": g.Expires, "revoked": g.Revoked, "active": g.active()}
+	return map[string]any{"id": g.ID, "name": g.Name, "scopes": g.Scopes, "download_root": g.Root, "directory": g.Directory, "category_dirs": g.CategoryDirs, "created_at": g.Created, "expires_at": g.Expires, "revoked": g.Revoked, "active": g.active()}
 }
-func (a *App) createAgent(name, dir string, scopes []string, days int) (AgentGrant, string, error) {
+func (a *App) createAgent(name string, scopes []string, days int) (AgentGrant, string, error) {
 	scopes = append([]string(nil), scopes...)
 	var empty AgentGrant
 	name = strings.TrimSpace(name)
@@ -87,19 +182,25 @@ func (a *App) createAgent(name, dir string, scopes []string, days int) (AgentGra
 	if root == "" {
 		root = a.rootPath
 	}
-	if dir == "" {
-		dir = settings.DefaultDir
+	dir := settings.DefaultDir
+	categories := map[string]string{}
+	categoryRouting := slices.Contains(scopes, "downloads:create")
+	if categoryRouting {
+		r, err := a.directoryAt(root, dir)
+		if err != nil {
+			return empty, "", errors.New("授权下载目录不存在或无法访问")
+		}
+		r.Close()
+		categories, err = validateAgentCategoryDirs(root, dir, settings.AgentCategoryDirs)
+		if err != nil {
+			return empty, "", err
+		}
 	}
-	r, err := a.directoryAt(root, dir)
-	if err != nil {
-		return empty, "", errors.New("授权下载目录不存在或无法访问")
-	}
-	r.Close()
 	slices.Sort(scopes)
 	scopes = slices.Compact(scopes)
 	token := "pz_agent_" + randomID() + randomID()
-	g := AgentGrant{ID: randomID(), Name: name, TokenHash: tokenHash(token), Scopes: scopes, Root: root, Directory: dir, Created: time.Now().UTC(), Expires: time.Now().UTC().Add(time.Duration(days) * 24 * time.Hour)}
-	err = a.change(func(st *State) error {
+	g := AgentGrant{ID: randomID(), Name: name, TokenHash: tokenHash(token), Scopes: scopes, Root: root, Directory: dir, CategoryDirs: categories, CategoryRouting: categoryRouting, Created: time.Now().UTC(), Expires: time.Now().UTC().Add(time.Duration(days) * 24 * time.Hour)}
+	err := a.change(func(st *State) error {
 		if len(st.Agents) >= 100 {
 			return errors.New("授权记录已达上限")
 		}
@@ -119,16 +220,15 @@ func (a *App) agentAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Path == "/api/agents" && r.Method == http.MethodPost {
 		var in struct {
-			Name      string   `json:"name"`
-			Directory string   `json:"directory"`
-			Scopes    []string `json:"scopes"`
-			Days      int      `json:"expires_days"`
+			Name   string   `json:"name"`
+			Scopes []string `json:"scopes"`
+			Days   int      `json:"expires_days"`
 		}
 		if err := body(r, &in); err != nil {
 			writeJSON(w, 400, map[string]string{"error": err.Error()})
 			return
 		}
-		g, token, err := a.createAgent(in.Name, in.Directory, in.Scopes, in.Days)
+		g, token, err := a.createAgent(in.Name, in.Scopes, in.Days)
 		if err != nil {
 			writeJSON(w, 400, map[string]string{"error": err.Error()})
 			return

@@ -21,6 +21,7 @@ type agentTaskView struct {
 	ID        string        `json:"id"`
 	Title     string        `json:"title"`
 	Status    string        `json:"status"`
+	NextRetry string        `json:"next_retry_at,omitempty"`
 	Directory string        `json:"directory"`
 	Context   string        `json:"context,omitempty"`
 	Error     string        `json:"error,omitempty"`
@@ -32,7 +33,7 @@ type agentTaskView struct {
 }
 
 func viewAgentTask(j Job) agentTaskView {
-	v := agentTaskView{ID: j.ID, Title: j.Title, Status: j.Status, Directory: j.Directory, Context: j.AgentContext, Error: j.Error, Created: j.Created, Progress: j.Progress, Files: len(j.Files)}
+	v := agentTaskView{ID: j.ID, Title: j.Title, Status: j.Status, NextRetry: j.NextRetryAt, Directory: j.Directory, Context: j.AgentContext, Error: j.Error, Created: j.Created, Progress: j.Progress, Files: len(j.Files)}
 	for _, f := range j.Files {
 		v.Size += f.Size
 		if f.Done {
@@ -241,6 +242,11 @@ func (a *App) callAgentTool(ctx context.Context, g AgentGrant, name string, args
 			return nil, err
 		}
 		items := []map[string]any{}
+		categories := make([]map[string]string, 0, len(g.CategoryDirs)+1)
+		for _, id := range sortedAgentCategoryIDs(g.CategoryDirs) {
+			categories = append(categories, map[string]string{"id": id, "name": agentCategoryNames[id]})
+		}
+		categories = append(categories, map[string]string{"id": categoryOther, "name": agentCategoryNames[categoryOther]})
 		var size int64
 		for i, f := range files {
 			if f.IsFile {
@@ -250,12 +256,13 @@ func (a *App) callAgentTool(ctx context.Context, g AgentGrant, name string, args
 				items = append(items, map[string]any{"name": f.Name, "size": f.Size, "is_file": f.IsFile})
 			}
 		}
-		return map[string]any{"choice_id": choice.ID, "title": choice.Title, "files": items, "item_count": len(files), "listed_file_bytes": size, "size_note": "仅包含当前目录文件，文件夹大小未递归统计", "expires_at": choice.Expires, "download_directory": g.Directory, "requires_confirmation": true}, nil
+		return map[string]any{"choice_id": choice.ID, "title": choice.Title, "files": items, "item_count": len(files), "listed_file_bytes": size, "size_note": "仅包含当前目录文件，文件夹大小未递归统计", "expires_at": choice.Expires, "categories": categories, "download_directory": g.Directory, "requires_confirmation": true}, nil
 	case "panzhan_download":
 		var in struct {
-			ChoiceID  string `json:"choice_id"`
-			RequestID string `json:"request_id"`
-			Confirmed bool   `json:"user_confirmed"`
+			ChoiceID   string `json:"choice_id"`
+			RequestID  string `json:"request_id"`
+			Confirmed  bool   `json:"user_confirmed"`
+			CategoryID string `json:"category_id"`
 		}
 		if err := decodeAgentArgs(args, &in); err != nil {
 			return nil, err
@@ -295,11 +302,25 @@ func (a *App) callAgentTool(ctx context.Context, g AgentGrant, name string, args
 			}
 			return nil, errors.New("此资源选择已使用")
 		}
-		job, err := a.createAgentJob(ctx, choice.URL, choice.Title, g.Directory, choice.Code, g.Root, agentJobMeta{GrantID: g.ID, Context: choice.Context, RequestID: in.RequestID, ChoiceID: choice.ID})
+		destination, categoryName, err := agentCategoryDestination(g, in.CategoryID)
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"task": viewAgentTask(job), "duplicate": false}, nil
+		if in.CategoryID != "" && in.CategoryID != categoryOther {
+			if _, err := validateAgentCategoryDirs(g.Root, g.Directory, map[string]string{in.CategoryID: destination}); err != nil {
+				return nil, errors.New("所选分类目录已离开授权的默认目录，请检查盘栈设置")
+			}
+		}
+		if dir, err := a.directoryAt(g.Root, destination); err != nil {
+			return nil, errors.New("所选分类目录已不存在或无法访问，请检查盘栈设置")
+		} else {
+			dir.Close()
+		}
+		job, err := a.createAgentJob(ctx, choice.URL, choice.Title, destination, choice.Code, g.Root, agentJobMeta{GrantID: g.ID, Context: choice.Context, RequestID: in.RequestID, ChoiceID: choice.ID})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"task": viewAgentTask(job), "category": map[string]string{"id": in.CategoryID, "name": categoryName}, "duplicate": false}, nil
 	case "panzhan_tasks":
 		var in struct {
 			TaskID  string `json:"task_id"`

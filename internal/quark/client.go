@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -38,6 +39,11 @@ type Client struct {
 	cookie   string
 	onCookie func(string)
 }
+
+type TemporaryError struct{ Err error }
+
+func (e *TemporaryError) Error() string { return e.Err.Error() }
+func (e *TemporaryError) Unwrap() error { return e.Err }
 
 func New(cookie string, onCookie func(string)) *Client {
 	return NewAt("https://drive-pc.quark.cn/1/clouddrive", cookie, onCookie)
@@ -114,7 +120,7 @@ func (c *Client) request(ctx context.Context, method, path string, params url.Va
 		if ctx.Err() != nil {
 			return out, ctx.Err()
 		}
-		return out, errors.New("夸克请求未收到响应，请检查网络或核对任务状态")
+		return out, &TemporaryError{Err: errors.New("夸克请求未收到响应，请检查网络或核对任务状态")}
 	}
 	defer res.Body.Close()
 	c.mergeCookies(res.Cookies())
@@ -122,13 +128,28 @@ func (c *Client) request(ctx context.Context, method, path string, params url.Va
 		if res.StatusCode == http.StatusNotFound && strings.HasPrefix(path, "/share/sharepage/") {
 			return out, errors.New("夸克返回 HTTP 404：分享可能已失效、已被删除或当前账号无权访问")
 		}
-		return out, fmt.Errorf("夸克 HTTP %d，请检查账号或网络", res.StatusCode)
+		message := fmt.Errorf("夸克 HTTP %d，请检查账号或网络", res.StatusCode)
+		if res.StatusCode == http.StatusRequestTimeout || res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= 500 {
+			return out, &TemporaryError{Err: message}
+		}
+		return out, message
 	}
 	if err = json.NewDecoder(io.LimitReader(res.Body, 16<<20)).Decode(&out); err != nil {
+		if ctx.Err() != nil {
+			return out, ctx.Err()
+		}
+		var networkError net.Error
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.As(err, &networkError) {
+			return out, &TemporaryError{Err: errors.New("夸克响应中断，将自动重试")}
+		}
 		return out, errors.New("夸克返回格式无法解析")
 	}
 	if out.Code != 0 || out.Status >= 400 {
-		return out, fmt.Errorf("夸克拒绝请求（状态 %d，代码 %d），请检查账号、分享及空间", out.Status, out.Code)
+		message := fmt.Errorf("夸克拒绝请求（状态 %d，代码 %d），请检查账号、分享及空间", out.Status, out.Code)
+		if out.Status == http.StatusRequestTimeout || out.Status == http.StatusTooManyRequests || out.Status >= 500 {
+			return out, &TemporaryError{Err: message}
+		}
+		return out, message
 	}
 	return out, nil
 }

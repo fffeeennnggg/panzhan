@@ -30,6 +30,16 @@ type Link struct {
 // failures and disk errors must still fail without writing unverified data.
 type retryableTransferError struct{ error }
 
+// Expired CDN credentials require resolving a new link at the task level,
+// rather than repeatedly requesting the same link inside retryTransfer.
+type refreshLinkError struct{ error }
+
+func IsRetryable(err error) bool {
+	var transient *retryableTransferError
+	var expired *refreshLinkError
+	return errors.As(err, &transient) || errors.As(err, &expired)
+}
+
 func retryTransfer(ctx context.Context, operation func() error) error {
 	for attempt := 0; ; attempt++ {
 		if err := ctx.Err(); err != nil {
@@ -284,7 +294,10 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 		start := int64(i) * chunk
 		n := min(chunk, size-start)
 		want := fmt.Sprintf("bytes %d-%d/%d", start, start+n-1, size)
-		if res.StatusCode == 500 || res.StatusCode == 502 || res.StatusCode == 503 || res.StatusCode == 504 {
+		if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden || res.StatusCode == http.StatusGone {
+			return &refreshLinkError{errors.New("下载直链已失效，将自动重新获取直链")}
+		}
+		if res.StatusCode == http.StatusRequestTimeout || res.StatusCode == http.StatusTooManyRequests || res.StatusCode == 500 || res.StatusCode == 502 || res.StatusCode == 503 || res.StatusCode == 504 {
 			return &retryableTransferError{fmt.Errorf("下载服务暂时不可用（HTTP %d）", res.StatusCode)}
 		}
 		if res.StatusCode != 206 || res.Header.Get("Content-Range") != want {
@@ -364,6 +377,16 @@ func (e *Engine) Fetch(ctx context.Context, root *os.Root, rel, identity string,
 			tracker.end()
 			if copyErr != nil || n != size {
 				tracker.discard(-1)
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				var diskError *os.PathError
+				if errors.As(copyErr, &diskError) {
+					return copyErr
+				}
+				if n < size {
+					return &retryableTransferError{errors.New("完整下载中断，将自动重新下载；服务器不支持分片续传")}
+				}
 				return errors.New("完整下载中断或长度不匹配；该服务器不支持分片续传")
 			}
 			if er = f.Sync(); er != nil {

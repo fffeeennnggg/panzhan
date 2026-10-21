@@ -10,5 +10,6 @@ __pycache__/
 *.pyc
 *.log
 *.fpk
+*.upk
 *.exe
 .env

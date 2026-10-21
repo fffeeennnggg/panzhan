@@ -1,6 +1,6 @@
 # OpenClaw / Hermes 接入盘栈
 
-盘栈 0.2.0 提供内置 MCP Streamable HTTP（JSON 响应、无服务器主动 SSE 流）和等价的授权 HTTP API。Skill 不是后端能力：可将配套 [Agent 操作说明](../integrations/agents/AGENT-INSTRUCTIONS.md) 放入 Agent 工作区，实际工具与授权均由盘栈执行。
+盘栈 0.2.2 提供内置 MCP Streamable HTTP（JSON 响应、无服务器主动 SSE 流）和等价的授权 HTTP API。接入包包含 [Hermes 盘栈 Skill](../integrations/agents/panzhan/README.md)，同一个 Skill 支持首次配置和日常使用；通用 [Agent 操作说明](../integrations/agents/AGENT-INSTRUCTIONS.md) 也可放入其他 Agent 工作区，实际工具与授权均由盘栈执行。后台任务会自动恢复临时网络故障，状态为 `retrying` 时返回 `next_retry_at`，Agent 无需重复创建任务。
 
 ## 交互流程
 
@@ -16,8 +16,8 @@ sequenceDiagram
   A-->>U: 展示候选
   U->>A: 下载第 2 个
   A->>P: panzhan_preview
-  P-->>A: 文件清单、限时 choice_id
-  A->>P: panzhan_download（确认、request_id）
+  P-->>A: 文件清单、限时 choice_id、授权类别
+  A->>P: panzhan_download（类别、确认、request_id）
   P-->>A: 后台任务 ID
   R->>P: 长轮询此授权未确认事件
   P-->>R: 完成或需要处理事件
@@ -30,7 +30,7 @@ sequenceDiagram
 
 ## 授权与地址
 
-在盘栈「设置 → Agent 授权」创建一个授权，选择名称、有效期、已授权下载根目录内的子目录，以及是否允许后台下载。完整令牌只返回一次；盘栈存储其 SHA-256 摘要。每个 Agent 单独创建令牌，可随时撤销；令牌只允许列出的工具，不能访问管理设置或夸克账号接口。
+先在「设置 → 下载位置」保存 NAS 共享根目录和默认目录，再在同页「Agent 授权」为电影、电视剧、动漫、音乐、学习资料或软件选择已存在的分类子目录。分类目录必须位于默认目录下；盘栈不会自动创建目录。创建授权只需设置名称、有效期和下载权限，下载授权自动继承当时的默认目录及分类映射。未配置的类别不会提供给 Agent，`other` 始终保存到授权默认目录。完整令牌只返回一次；盘栈存储其 SHA-256 摘要。每个 Agent 单独创建令牌，可随时撤销；令牌只允许列出的工具，不能访问管理设置或夸克账号接口。
 
 | 部署方式 | MCP 地址 |
 | --- | --- |
@@ -41,7 +41,7 @@ sequenceDiagram
 
 此功能不会自动开放路由器端口或建立公网隧道。MCP 客户端与通知监听器均主动连接盘栈；监听器运行在 Agent 主机上，再连接本机的 Agent Webhook，因此盘栈不需要反向访问远程 Agent 的私有地址。
 
-授权包含 `resources:read`（搜索/预览）、`downloads:create`（后台下载）、`tasks:read`（本授权任务）、`events:read`（本授权事件与确认）。授权创建时固定下载根与子目录；之后更改盘栈默认下载位置不会扩大既有 Agent 授权，需撤销并重新创建。事件和任务按授权隔离，同一授权可以通过 `context` 路由别名区分会话；别名不是微信身份验证，网关必须限制谁能使用该 Agent。
+授权包含 `resources:read`（搜索/预览）、`downloads:create`（后台下载）、`tasks:read`（本授权任务）、`events:read`（本授权事件与确认）。授权创建时固定下载根、默认目录和分类映射快照；之后修改盘栈设置不会改写既有授权，需撤销并重新创建以应用新配置。Agent 先预览，再从本次预览返回的分类 ID 中选择；下载接口不接受 Agent 提交的路径。类别目录被删除或失去权限时，任务会返回错误，不会静默改存其他位置。没有分类快照的旧授权继续使用创建时固定目录和旧请求格式。事件和任务按授权隔离，同一授权可以通过 `context` 路由别名区分会话；别名不是微信身份验证，网关必须限制谁能使用该 Agent。
 
 ## MCP 配置
 

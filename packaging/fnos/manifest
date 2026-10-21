@@ -1,5 +1,5 @@
 appname=panzhan
-version=0.2.0
+version=0.2.2
 display_name=盘栈
 desc=独立搜索、夸克转存与NAS下载单进程应用，无需其他服务。
 platform=x86
@@ -12,4 +12,4 @@ service_port=9867
 checkport=true
 ctl_stop=true
 disable_authorization_path=false
-changelog=新增独立 Agent 授权、通用 MCP 与 API、确认后后台下载及可补取的完成通知，兼容同机或远程 OpenClaw 与 Hermes。
+changelog=Agent 授权继承默认下载目录并支持预设分类目录自动路由；下载任务临时故障自动重试，接入包包含 Hermes Skill。

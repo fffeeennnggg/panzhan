@@ -333,7 +333,7 @@ func TestTransientRangesRetryWithoutCorruptingPublishedFile(t *testing.T) {
 	}
 }
 
-func TestForbiddenRangesAreNotRetried(t *testing.T) {
+func TestExpiredDownloadLinkRequiresRefreshWithoutRetryingSameLink(t *testing.T) {
 	var calls atomic.Int64
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -346,8 +346,28 @@ func TestForbiddenRangesAreNotRetried(t *testing.T) {
 	}
 	defer root.Close()
 	err = (&Engine{ChunkSize: 4, Concurrency: 3}).Fetch(context.Background(), root, "file", "id", 8, "", func(context.Context) (Link, error) { return Link{URL: server.URL}, nil }, nil)
-	if err == nil || calls.Load() != 1 {
+	if err == nil || calls.Load() != 1 || !IsRetryable(err) {
 		t.Fatalf("authorization failure retried: calls=%d error=%v", calls.Load(), err)
+	}
+}
+
+func TestInterruptedSequentialDownloadCanBeRetried(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "8")
+		w.Write([]byte("short"))
+	}))
+	defer server.Close()
+	root, err := os.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer root.Close()
+	err = (&Engine{ChunkSize: 4, Concurrency: 1}).Fetch(context.Background(), root, "file", "id", 8, "", func(context.Context) (Link, error) { return Link{URL: server.URL}, nil }, nil)
+	if err == nil || !IsRetryable(err) {
+		t.Fatalf("interrupted sequential stream not retryable: %v", err)
+	}
+	if _, err := root.Stat("file"); !os.IsNotExist(err) {
+		t.Fatal("incomplete stream published", err)
 	}
 }
 

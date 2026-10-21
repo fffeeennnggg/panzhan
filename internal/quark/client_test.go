@@ -3,11 +3,82 @@ package quark
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
+	"syscall"
 	"testing"
 )
+
+type responseBodyTransport struct{ reader io.Reader }
+
+func (transport responseBodyTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(transport.reader)}, nil
+}
+
+type responseBodyReadError struct{ err error }
+
+func (reader responseBodyReadError) Read([]byte) (int, error) { return 0, reader.err }
+
+func TestResponseBodyFailureClassification(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		reader    io.Reader
+		temporary bool
+	}{
+		{"connection_reset", responseBodyReadError{&net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}}, true},
+		{"client_read_timeout", responseBodyReadError{os.ErrDeadlineExceeded}, true},
+		{"partial_response_reset", io.MultiReader(strings.NewReader(`{"status":200,`), responseBodyReadError{&net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}}), true},
+		{"malformed_json", strings.NewReader(`{"status":invalid}`), false},
+		{"incompatible_json", strings.NewReader(`{"status":"invalid"}`), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := NewAt("https://fixture.invalid", "fixture", nil)
+			c.http.Transport = responseBodyTransport{tc.reader}
+			_, err := c.request(context.Background(), http.MethodGet, "/fixture", nil, nil, "fixture")
+			var temporary *TemporaryError
+			if err == nil || errors.As(err, &temporary) != tc.temporary {
+				t.Fatalf("temporary=%v want=%v err=%v", temporary != nil, tc.temporary, err)
+			}
+		})
+	}
+}
+
+func TestTemporaryResponseClassification(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		httpStatus int
+		body       string
+		temporary  bool
+	}{
+		{"timeout", 408, "", true},
+		{"throttled", 429, "", true},
+		{"unavailable", 503, "", true},
+		{"json_throttled", 200, `{"status":429,"code":1}`, true},
+		{"json_unavailable", 200, `{"status":503,"code":1}`, true},
+		{"truncated", 200, `{"status":200,`, true},
+		{"unauthorized", 401, "", false},
+		{"forbidden", 403, "", false},
+		{"invalid_share", 200, `{"status":400,"code":41001}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.httpStatus)
+				w.Write([]byte(tc.body))
+			}))
+			defer srv.Close()
+			_, err := NewAt(srv.URL, "fixture", nil).request(context.Background(), "GET", "/fixture", nil, nil, "fixture")
+			var temporary *TemporaryError
+			if err == nil || errors.As(err, &temporary) != tc.temporary {
+				t.Fatalf("temporary=%v want=%v err=%v", temporary != nil, tc.temporary, err)
+			}
+		})
+	}
+}
 
 func TestParseShare(t *testing.T) {
 	s, err := ParseShare("分享：https://pan.quark.cn/s/Ab12?pwd=9xyZ#/list/share/0123456789abcdef0123456789abcdef-资料 提取码：9xyZ")

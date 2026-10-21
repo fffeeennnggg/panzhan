@@ -1,85 +1,136 @@
 # 盘栈
 
-飞牛 fnOS 的独立网盘资源工具。搜索或导入夸克分享，预览目录，转存到自己的夸克账号，再把真实文件下载到 NAS 授权目录。
+盘栈是面向 NAS 的夸克网盘资源搜索与下载工具，提供网页界面、搜索聚合、夸克分享预览、转存和下载任务管理。它以 Go 单程序运行，前端静态资源嵌入程序中。
 
-**当前版本：0.2.0，目标 x86_64。** 使用自有 Go 后端、内嵌前端、任务与下载引擎，没有 AList、PanSou、QAS 或 Docker 运行时。飞牛安装包的首次管理密码可在安装向导中设置；下载可保存到盘栈已获飞牛授权的共享目录。许可为 AGPL-3.0，来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+**当前版本：0.2.2。** 主要面向飞牛 fnOS x86_64；仓库也提供绿联 UGOS Pro ARM64 的 Docker 部署文件。项目采用 AGPL-3.0，第三方代码与资源的来源及许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-## 已实现
+## 功能
 
-- 通用 Agent 授权：设置页独立令牌、权限、下载子目录、有效期与撤销；内置 MCP 和 HTTP API，支持同机、容器或远程 OpenClaw/Hermes。搜索候选、预览后明确确认、幂等创建后台下载，按授权隔离任务与完成事件。事件跨重启补取，配套轻量监听器交付到原聊天会话；微信网关由 Agent 负责。设置页可下载不含凭据的接入包，详细步骤见 [Agent 接入说明](docs/agent-integration.md)。
-- 搜索优先界面：资源搜索、下载任务、网盘账号、搜索来源、设置；支持手机宽度。
-- 多来源聚合：现有网页来源、Telegram 公开频道与 PanSou issue #4 清单中的 67 个搜索插件在盘栈进程内注册；搜索结果只接收经过 HTTPS 主机校验的夸克分享，保留提取码和作品标题。网页插件与频道任务沿用独立并发、逐批显示、暂停/继续、退避重试和 LRU 搜索缓存。需要账号或专属配置的来源会在来源页标记。
-- Telegram 频道采用 PanSou issue #4 于 2026-10-09 更新的清单快照：`CHANNELS` 实际有 111 个不同频道（issue 标题标注为 110）。其中 5 个优先调度，其余 106 个按普通频道并发搜索；来源页显示当前频道数。清单随程序打包，不在启动时抓取远程配置。
-- 搜索结果自动分批验证公开夸克分享，确认取消、过期或不存在的链接自动隐藏。提取码错误、网络超时、限流和无法确认的状态保留并标记，不误判为失效。有效结果缓存 30 分钟、失效结果 10 分钟；验证不使用账号 Cookie，也不进行转存。默认“优质优先”综合近期有效性、关键词匹配、标题画质信息及来源数量，标题中的 4K/蓝光等标签不代表已检验文件实际质量。
-- 打开分享前即可在结果列表查看实际文件类型、扩展名、文件数量与大小。统计会读取文件夹内容，每个分享最多读取 6 页目录；未遍历完或部分文件大小未知时明确标注“未统计完整”，不把文件夹的 size 当作内容总大小。
-- 支持按视频、音频、图片、文档、压缩包、应用、字幕、其他文件、混合文件、含文件夹和类型未知筛选。类型依据分享内已读取的实际文件判断，混合分享可同时出现在视频和文档筛选中；未知类型不会仅凭标题当作视频。
-- 新安装默认启用聚合来源；旧安装原先仅启用 PanSearch 时会升级到新来源集合，自定义来源配置保持原样。蜡笔已因失效移除；至臻不是可靠来源，也不再列出。BT 搜索结果不能进入夸克转存链路，因此不接入 Nyaa、The Pirate Bay。所有结果仍校验并只保留夸克分享链接。
-- 直接导入夸克分享、提取码和链接指定子目录；预览当前分享目录。
-- 必要夸克协议移植：分享 token、分页、每批最多 100 项转存、转存后文件 ID、原文件直链和会话匹配请求头。
-- 持久化任务与转存意图、已知 task_id 恢复查询；不确定转存不自动重放，可在详情核对或确认空批次后重新提交。
-- Range 响应头验证后立即启动并发，分组同步分片和 SHA-256 恢复日志；临时网络错误、短响应和 HTTP 500/502/503/504 有限退避重试，授权错误及不匹配的 Range 不盲目重试。服务器忽略 Range 时改为从头完整下载。
-- 下载任务列表和详情每秒更新实时速度、接收进度、总大小、预计剩余时间、已用时、当前文件与实际连接数；速度按近期网络接收量计算，续传数据不计入新下载速度，暂停、断线和校验阶段不会显示旧速率。恢复记录仍只记录已完整写入并校验的分片。
-- 文件大小、本地 SHA-256，以及存在上游 MD5 时的 MD5 检查；已存在文件不会覆盖。
-- 管理密码、一次性安装令牌、同源写入保护、加密 Cookie、本机授权目录约束。
-- Linux amd64 单程序构建与官方 fnpack 原生 FPK；可进行 Linux 生命周期和归档校验。
+- 聚合网页来源、Telegram 公开频道和 PanSou 插件搜索夸克分享，并检查分享状态。
+- 预览分享目录、文件类型和大小，再转存到自己的夸克账号。
+- 将文件下载到 NAS 授权目录，支持并发分片、断点恢复、完整性校验和临时网络故障自动重试。
+- 管理下载任务、搜索来源和账号；提供适配桌面与手机宽度的网页界面。
+- 提供范围受限的 MCP 与 HTTP API，供 OpenClaw、Hermes 等 Agent 搜索、预览和创建下载任务。
+
+搜索结果仅保留夸克分享。部分搜索来源需要额外配置或受网络环境影响，可在“搜索来源”页面查看状态；标题中的清晰度等标签不代表已检验文件实际质量。
+
+## 平台支持
+
+| 方式 | 目标平台 | 说明 |
+| --- | --- | --- |
+| 原生 FPK | 飞牛 fnOS x86_64 | 安装向导设置密码，下载保存到应用获授权的共享目录 |
+| Docker / Compose | 绿联 UGOS Pro ARM64 | 从源码构建镜像，独立挂载配置与下载目录 |
+| 源码运行 | 安装 Go 的开发环境 | 用于本地开发、测试与调试 |
+
+程序内置搜索、转存和下载功能，无需另行运行 AList、PanSou 或 QAS 服务。
 
 ## 本地运行
 
-安装 Go 1.26 或更新版本：
+需要 Git 和 Go 1.26 或更新版本：
 
 ```sh
+git clone https://github.com/fffeeennnggg/fn.git
+cd fn
 go run ./cmd/panzhan -listen 127.0.0.1:9867 -data ./data -root ./downloads
 ```
 
-打开 http://127.0.0.1:9867。通用开发运行首次设置使用 `data/setup-token.txt` 和至少 8 个字符的密码；飞牛安装包可在安装向导中确认管理密码，安装后直接登录，无需找 SSH 令牌。进入“网盘账号”保存自己夸克网页端的 Cookie 并验证，再选择授权目录。页面不会回显完整 Cookie。
+首次运行会在 `data/setup-token.txt` 生成一次性设置令牌。打开 <http://127.0.0.1:9867>，使用令牌设置至少 8 个字符的管理密码。登录后，在“网盘账号”页面配置自己的夸克 Cookie，并选择授权下载目录。
 
-不能双击 `internal/web/assets/index.html` 预览应用：`file://` 没有后端 API，浏览器也会限制模块脚本加载。请先启动上述程序，再通过 HTTP 地址打开。Windows 已构建时也可运行 `dist/panzhan.exe -listen 127.0.0.1:9867 -data data -root downloads`。
+默认监听地址仅限本机。NAS 部署时请按对应部署文档设置网络访问，并避免将未配置 HTTPS 的管理端口直接暴露到公网。
 
-监听地址默认仅本机；NAS 包通过局域网端口 9867 打开，并使用应用自己的密码认证。下载根目录由启动参数指定，页面仅浏览其内部目录。每个任务创建“资源名-任务编号”子目录。
+前端由后端提供服务，请通过上述 HTTP 地址访问；直接打开 `internal/web/assets/index.html` 无法使用应用。
 
-## FPK
+## 构建与部署
 
-安装包输出：`dist/panzhan.fpk`。原生程序：`dist/panzhan-linux-amd64`。
+飞牛 fnOS 原生安装包为 Linux x86_64 `.fpk`。安装 Go、Python 3 和官方 `fnpack` 后运行：
 
 ```sh
-python scripts/build.py --fnpack /path/to/official/fnpack
+python3 scripts/build.py --fnpack /path/to/fnpack
 ```
 
-Windows 需使用已配置的 Ubuntu WSL 和官方 Linux fnpack，以保留归档中的 Linux 执行位：
+默认输出为 `dist/panzhan.fpk`，可通过飞牛应用中心手动安装。也可以指定版本目录保存产物：
 
-```powershell
-python -X utf8 scripts/build.py --wsl --fnpack .cache/tools/fnpack-linux-amd64
+```sh
+python3 scripts/build.py --fnpack /path/to/fnpack --output-dir dist/release-0.2.2-final
+python3 scripts/check_package.py --fpk dist/release-0.2.2-final/panzhan.fpk
 ```
 
-已有其他 WSL 发行版时，可通过 `--wsl-distribution 发行版名称` 选择；打包过程仅依赖 POSIX shell 和基本文件工具，不要求该发行版安装 Go 或 Python。
+Windows 开发环境的 WSL 构建方式、手动安装、升级及权限说明见 [飞牛安装指南](docs/fnos-install.md)。Agent 配置见 [Agent 接入说明](docs/agent-integration.md)。
 
-完整安装、共享目录、首次令牌及升级说明见 [docs/fnos-install.md](docs/fnos-install.md)。安装包内默认使用系统创建的 `panzhan/downloads` 共享目录，不提供全盘写入权限。
+绿联 UGOS Pro ARM64 的 Docker 部署文件位于 [`deploy/ugreen-docker`](deploy/ugreen-docker/README.md)。该方式使用 Docker 和 Compose，不生成或安装 UPK。
 
-## 验证与边界
+## 开发与测试
 
 ```sh
 go test ./...
 go vet ./...
-python -X utf8 scripts/check_package.py --self-test
-python -X utf8 scripts/check_package.py --fpk dist/panzhan.fpk
+python3 -X utf8 scripts/check_package.py --self-test
 ```
 
-浏览器测试：先构建 `go build -o dist/panzhan.exe ./cmd/panzhan`，再运行 `node scripts/browser-smoke.cjs`。测试需本地 Playwright/Chrome；可通过 `PANZHAN_PLAYWRIGHT`（包路径）、`PANZHAN_CHROME`（浏览器路径）覆盖默认位置。浏览器测试会创建独立 `.cache` 数据目录；搜索、分享响应使用离线 fixture，不会调用真实网盘。
+前端模块测试使用 Node.js：
 
-真实来源只读探测（不需要夸克凭据）：设置 `PANZHAN_LIVE_SEARCH=1` 后执行 `go test ./internal/search -run TestLiveSources -count=1 -v`。该测试只报告网络和来源响应，不把零结果或错误当成可用性证明；来源请求格式与解析器有本地 fixture 覆盖。
+```sh
+node --test scripts/*.test.mjs
+```
 
-2026-10-16 在当前开发网络经系统代理验证 PanSearch：关键词 Blender 返回 45 条夸克链接，去重后 31 条；仅验证搜索返回，未验证分享有效或可转存。本机直连被重置连接，Go 不读取 Windows 系统代理；开发运行如需代理可设置标准 `HTTPS_PROXY` / `HTTP_PROXY` 环境变量（不要将本机代理地址照搬到 NAS）。蜡笔曾超时、至臻页面解析失败，已从来源目录中移除。
+本仓库保留应用源码、必要资源、测试、部署配置与文档，不附带预编译程序、安装包或宣传视频。构建脚本会在 `dist/` 写入本机生成物；这些构建产物不纳入源码仓库。发布包应与对应版本的完整源码、构建说明和许可文件一起分发。
 
-当前已建立本地 HTTP 协议与文件落盘的端到端测试。0.1.5 已在一台用户飞牛设备上安装，验证真实夸克文件的限时接收和临时写盘同步；同一设备上的既有下载任务也已完成。完整生命周期和不同设备、网络的兼容性仍需验证，不承诺固定带宽或达到 AList 同等速度。具体数据和实验限制见 [下载速度实验记录](docs/research/2026-10-17-download-speed-experiments.md)。
+## 项目结构
 
-已登录管理员可在所有下载暂停或停止后调用 `POST /api/tasks/{id}/diagnose`，对任务内已转存文件做 NAS 原机诊断，返回网络接收速率、响应头等待和 8 MiB 临时写盘同步耗时。测试限时、限流量，临时文件自动清理，不返回 Cookie 或完整直链；请求参数和限制见上述实验记录。
+| 目录 | 内容 |
+| --- | --- |
+| `cmd/panzhan/` | 主程序入口 |
+| `internal/app/` | 管理接口、授权、任务和持久化 |
+| `internal/download/` | 下载、分片、校验与恢复 |
+| `internal/quark/` | 夸克分享与账号接口 |
+| `internal/search/` | 搜索来源、调度与插件 |
+| `internal/web/` | 嵌入式网页资源 |
+| `packaging/fnos/` | 飞牛安装包模板和生命周期脚本 |
+| `deploy/` | Docker 部署配置 |
+| `integrations/agents/` | Agent 配置示例和 Hermes Skill |
+| `scripts/` | 构建、验证和辅助工具 |
+| `docs/` | 安装、接入及技术记录 |
 
-首版顺序执行任务，单文件可并发；未实现任意文件多选、自动删云端、其他盘下载、订阅追更、限速和媒体整理。空目录不单独下载。使用 FAT/exFAT 等不支持硬链接的保存卷时，原子发布会失败并保留临时文件；当前以 fnOS 常用的支持硬链接文件系统为目标。
+## 数据与安全
 
-## 数据恢复
+运行数据保存在启动参数指定的 `data` 与 `downloads` 目录中，包含管理状态、加密后的网盘会话、任务记录及下载文件。备份时请将 `state.json` 与 `master.key` 一并保存；不要提交运行数据、账号 Cookie、管理密码或 Agent Token。
 
-`state.json`、`master.key` 必须一同备份；状态与密钥任一缺失时会停止启动，不会静默重置已有安装。任务状态在写入成功后才确认，断电/重启会核对已完成分片。下载目录内的 `.pz.part`、`.pz.json`、`.pz.json.tmp`、`.pz.receipt` 是恢复记录，不要在任务尚未完成时删除；分享中占用这些后缀的文件会被拒绝，需先在网盘更名。取消任务只停止处理，不删除云端或本地文件。
+Agent 令牌只返回一次，可单独撤销。下载 API 使用预览确认和授权目录约束；不要把管理密码、Cookie 或 Agent Token 放进 issue、日志、截图或公开配置文件。
 
-遇到不确定转存，先在夸克核对 `/盘栈转存/任务编号/batch-编号`，再使用任务详情中的核对操作。程序不会替用户删除云端内容。
+下载中的 `.pz.part`、`.pz.json`、`.pz.json.tmp` 和 `.pz.receipt` 用于断点恢复，任务未完成时请保留。暂停或取消任务只停止处理，不删除本地文件或云端内容。转存结果不确定时，请先核对夸克中的 `/盘栈转存/任务编号/batch-编号`，再通过任务详情核对，避免重复提交。
 
-调研与方案：[能力提取](docs/research/2026-10-15-capability-extraction.md)、[可行性与页面设计](docs/research/2026-10-15-product-feasibility-and-pages.md)、[当前实施计划](docs/superpowers/plans/2026-10-16-independent-app.md)。旧的服务打包方案已经撤回。
+## 当前限制
+
+- 下载与转存主要支持夸克；不提供其他网盘下载、订阅追更、自动媒体整理或自动删除云端文件。
+- 任务顺序执行，单文件可并发；空目录不单独下载。
+- 文件发布依赖保存卷支持硬链接，FAT/exFAT 等文件系统不适用。
+- 搜索来源、夸克接口和网络状况会影响可用性与下载速度，不承诺固定带宽。
+- 最新版本的完整 NAS 生命周期及不同设备兼容性仍需在目标设备验证；本地测试与打包检查不能替代真机验收。
+
+反馈问题时，请注明盘栈版本、NAS 型号、系统版本、部署方式和复现步骤，并提供脱敏后的错误信息。
+
+## 开源协议
+
+盘栈整体以 **GNU Affero General Public License v3.0（AGPL-3.0）** 发布，完整条款见 [LICENSE](LICENSE)。本项目新增文件如标注 `AGPL-3.0-or-later`，适用文件中的标注；复用的第三方代码和资源保留其原版权及许可。
+
+- 可以依照协议使用、研究、修改和再分发，也允许商业使用。
+- 再分发源码或二进制时，应保留版权、许可和修改声明，并按协议提供相应的完整源码及构建所需内容；基于本项目形成的受协议约束的修改版本也应遵守 AGPL。
+- 如果修改本程序并通过网络向用户提供交互服务，AGPL 第 13 条要求向这些用户显著提供获取该修改版本对应源码的机会。
+- 本软件按协议“按原样”提供，不附带担保。以上是便于理解的摘要，具体权利和义务以许可原文为准。
+
+第三方来源、复用范围、上游版本和许可文件详见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。致谢不替代各项目的许可要求。
+
+## 致谢
+
+感谢以下项目及其维护者的工作：
+
+| 项目 | 盘栈中的使用或参考 | 上游许可 |
+| --- | --- | --- |
+| [AList](https://github.com/AlistGo/alist) | 夸克下载协议、会话与请求头处理，以及并发 Range 下载思路 | AGPL-3.0 |
+| [quark-auto-save](https://github.com/Cp0204/quark-auto-save) | 夸克分享、目录、批量转存与任务查询协议 | AGPL-3.0 |
+| [PanSou](https://github.com/fish2018/pansou) | 搜索插件及其共用代码；公开 Telegram 频道清单来自其 issue #4 | MIT，见 [许可文本](licenses/PanSou-MIT.txt) |
+| [golang.org/x/net](https://go.googlesource.com/net) | HTML 解析能力 | BSD-3-Clause，见 [许可文本](licenses/Go-x-net-BSD.txt) |
+| [Work Sans](https://github.com/weiweihuanghuang/Work-Sans) | 网页界面使用的本地字体 | SIL OFL 1.1，见 [字体许可](internal/web/assets/fonts/OFL.txt) |
+| [PanHub](https://github.com/wu529778790/panhub.shenzjd.com) | 调研与交互参考，未复制其代码、素材或外部后端接口调用 | PolyForm Noncommercial |
+
+也感谢 Go 生态中的依赖项目与贡献者；直接及间接依赖版本记录在 [go.mod](go.mod) 和 [go.sum](go.sum) 中，使用与分发时仍需遵守各依赖自身的许可。

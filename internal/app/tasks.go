@@ -41,6 +41,105 @@ func (a *App) signal() {
 	default:
 	}
 }
+
+func taskRetryDelay(retryCount int) time.Duration {
+	if retryCount < 1 {
+		retryCount = 1
+	}
+	delay := 15 * time.Second
+	for i := 1; i < retryCount && delay < 15*time.Minute; i++ {
+		delay *= 2
+	}
+	if delay > 15*time.Minute {
+		return 15 * time.Minute
+	}
+	return delay
+}
+
+func isRetryableTaskError(err error) bool {
+	var temporary *quark.TemporaryError
+	return errors.As(err, &temporary) || download.IsRetryable(err)
+}
+
+// Old state files only contain a user-facing error string. Match known
+// transient messages conservatively; never replay uncertain save requests.
+func legacyRetryableJob(j Job) bool {
+	if j.Status != "attention" || j.Uncertain {
+		return false
+	}
+	for _, prefix := range []string{"下载网络异常", "下载服务暂时不可用", "分片长度不完整", "夸克请求未收到响应"} {
+		if strings.HasPrefix(j.Error, prefix) {
+			return true
+		}
+	}
+	for _, code := range []int{408, 429, 500, 502, 503, 504} {
+		if strings.HasPrefix(j.Error, fmt.Sprintf("夸克 HTTP %d，", code)) {
+			return true
+		}
+	}
+	if j.Error == "转存仍未结束，请稍后重试以查询同一个任务" {
+		for _, b := range j.Batches {
+			if b.TaskID != "" && !b.Done {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (a *App) recordRunFailure(id string, err error) bool {
+	retryScheduled := false
+	updateErr := a.update(id, func(j *Job) error {
+		if j.Status == "paused" || j.Status == "cancelled" {
+			return nil
+		}
+		j.Error = err.Error()
+		if !j.Uncertain && isRetryableTaskError(err) {
+			j.Status = "retrying"
+			j.RetryCount++
+			j.NextRetryAt = time.Now().Add(taskRetryDelay(j.RetryCount)).Format(time.RFC3339)
+			retryScheduled = true
+			return nil
+		}
+		j.Status = "attention"
+		j.NextRetryAt = ""
+		return nil
+	})
+	return updateErr == nil && retryScheduled
+}
+
+func (a *App) queueDueRetries(now time.Time) {
+	st := a.snapshot()
+	due := false
+	for _, j := range st.Jobs {
+		if j.Status != "retrying" || j.NextRetryAt == "" {
+			continue
+		}
+		at, err := time.Parse(time.RFC3339, j.NextRetryAt)
+		if err == nil && !now.Before(at) {
+			due = true
+			break
+		}
+	}
+	if !due {
+		return
+	}
+	_ = a.change(func(st *State) error {
+		for i := range st.Jobs {
+			j := &st.Jobs[i]
+			if j.Status != "retrying" || j.NextRetryAt == "" {
+				continue
+			}
+			at, err := time.Parse(time.RFC3339, j.NextRetryAt)
+			if err == nil && !now.Before(at) {
+				j.Status = "queued"
+				j.NextRetryAt = ""
+			}
+		}
+		return nil
+	})
+}
+
 func (a *App) preview(ctx context.Context, raw, code string) (quark.Share, []quark.File, error) {
 	s, err := quark.ParseShare(raw)
 	if err != nil {
@@ -140,6 +239,7 @@ func (a *App) Run(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		a.queueDueRetries(time.Now())
 		var next string
 		a.mu.Lock()
 		for _, j := range a.state.Jobs {
@@ -160,11 +260,11 @@ func (a *App) Run(ctx context.Context) {
 			wasCancelled := child.Err() != nil
 			cancel()
 			if err != nil && !wasCancelled {
+				a.recordRunFailure(next, err)
+			} else if err == nil {
 				_ = a.update(next, func(j *Job) error {
-					if j.Status != "paused" && j.Status != "cancelled" {
-						j.Status = "attention"
-						j.Error = err.Error()
-					}
+					j.RetryCount = 0
+					j.NextRetryAt = ""
 					return nil
 				})
 			}
@@ -300,6 +400,9 @@ func (a *App) runJob(ctx context.Context, id string) error {
 			done, result, er := c.SaveStatus(pollCtx, b.TaskID)
 			if er != nil {
 				cancel()
+				if errors.Is(er, context.DeadlineExceeded) && ctx.Err() == nil {
+					return &quark.TemporaryError{Err: errors.New("转存仍在进行，将自动查询同一个任务")}
+				}
 				return er
 			}
 			if done {
@@ -309,7 +412,10 @@ func (a *App) runJob(ctx context.Context, id string) error {
 			select {
 			case <-pollCtx.Done():
 				cancel()
-				return errors.New("转存仍未结束，请稍后重试以查询同一个任务")
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				return &quark.TemporaryError{Err: errors.New("转存仍在进行，将自动查询同一个任务")}
 			case <-time.After(time.Second):
 			}
 		}
@@ -563,15 +669,17 @@ func (a *App) action(ctx context.Context, id, action, dir string) error {
 	err = a.update(id, func(job *Job) error {
 		switch action {
 		case "pause":
-			if job.Status != "queued" && job.Status != "transferring" && job.Status != "downloading" && job.Status != "verifying" {
+			if job.Status != "queued" && job.Status != "retrying" && job.Status != "transferring" && job.Status != "downloading" && job.Status != "verifying" {
 				return errors.New("当前任务不能暂停")
 			}
 			job.Status = "paused"
+			job.NextRetryAt = ""
 		case "cancel":
 			if job.Status == "completed" {
 				return errors.New("已完成任务不需要取消")
 			}
 			job.Status = "cancelled"
+			job.NextRetryAt = ""
 		case "resume", "retry":
 			if job.Status != "paused" && job.Status != "attention" {
 				return errors.New("当前任务不需要恢复")
@@ -581,6 +689,7 @@ func (a *App) action(ctx context.Context, id, action, dir string) error {
 			}
 			job.Status = "queued"
 			job.Error = ""
+			job.NextRetryAt = ""
 			if dir != "" {
 				job.Directory = path.Join(dir, safeTitle(job.Title)+"-"+job.ID[:8])
 			}

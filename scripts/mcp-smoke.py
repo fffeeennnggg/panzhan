@@ -49,7 +49,7 @@ def main():
                     status=api('status');break
                 except OSError:time.sleep(.1)
             else:raise RuntimeError('Temporary fixture server did not start')
-            assert status['version']=='0.2.0'
+            assert status['version']=='0.2.2'
             api('login',{'password':'sdk-fixture-pass'})
             created=api('agents',{'name':'Official SDK fixture','scopes':['resources:read','downloads:create','tasks:read','events:read'],'expires_days':1})
             token=created['token']
